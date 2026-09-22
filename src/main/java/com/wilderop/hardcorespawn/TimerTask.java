@@ -25,6 +25,8 @@ public final class TimerTask extends BukkitRunnable {
     /** Package-private for tests. */
     void tick(long now) {
         HardcoreConfig config = sessions.getConfig();
+        // Run-start countdowns tick even though their players have no session yet.
+        sessions.tickStartCountdowns(now);
         for (Session s : sessions.sessionsSnapshot()) {
             if (s.questDeadlineMs == 0 || s.quest == null) {
                 continue; // paused across a restart, or no quest assigned yet

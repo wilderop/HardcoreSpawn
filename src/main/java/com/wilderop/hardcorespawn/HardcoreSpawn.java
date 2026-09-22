@@ -27,6 +27,8 @@ public class HardcoreSpawn extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new QuestListener(sessionManager), this);
         getServer().getPluginManager().registerEvents(
                 new SessionListener(sessionManager, snapshotManager), this);
+        getServer().getPluginManager().registerEvents(
+                new StartFreezeListener(sessionManager), this);
 
         getCommand("hardcore").setExecutor(new HardcoreCommand(sessionManager));
         getCommand("hardcoreadmin").setExecutor(new HardcoreAdminCommand(this, sessionManager));

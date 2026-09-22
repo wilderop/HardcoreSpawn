@@ -1,5 +1,7 @@
 package com.wilderop.hardcorespawn;
 
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -27,6 +29,25 @@ public final class SessionManager {
     /** A snapshot restore waiting for a respawn or a rejoin. */
     public record PendingRestore(Snapshot snapshot, Location returnLocation, String messageKey, int level) {}
 
+    /**
+     * A run start counting down: the player must stand still and take no
+     * damage until {@code endMs}, or the start is cancelled. The snapshot is
+     * only taken when the countdown completes, so a cancelled start costs the
+     * player nothing.
+     */
+    private static final class StartCountdown {
+        final UUID playerId;
+        final long endMs;
+        int lastShown = -1;
+
+        StartCountdown(UUID playerId, long endMs) {
+            this.playerId = playerId;
+            this.endMs = endMs;
+        }
+    }
+
+    private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
+
     private final HardcoreSpawn plugin;
     private HardcoreConfig config;
     private final SnapshotManager snapshots;
@@ -36,6 +57,7 @@ public final class SessionManager {
 
     private final Map<UUID, Session> sessions = new HashMap<>();
     private final Map<UUID, Long> pendingConfirms = new HashMap<>();
+    private final Map<UUID, StartCountdown> pendingStarts = new HashMap<>();
     private final Map<UUID, PendingRestore> pendingRespawnRestores = new HashMap<>();
     private final Map<UUID, PendingRestore> pendingOfflineRestores = new HashMap<>();
 
@@ -88,6 +110,10 @@ public final class SessionManager {
 
     public boolean confirmStart(Player player) {
         UUID id = player.getUniqueId();
+        if (pendingStarts.containsKey(id)) {
+            player.sendMessage(config.format("confirm-freeze-active", Map.of()));
+            return false;
+        }
         Long requested = pendingConfirms.get(id);
         long now = System.currentTimeMillis();
         if (requested == null || now - requested > 60_000) {
@@ -106,6 +132,29 @@ public final class SessionManager {
             return false;
         }
         pendingConfirms.remove(id);
+        int freezeSeconds = config.getStartFreezeSeconds();
+        if (freezeSeconds <= 0) {
+            return finishStart(player, now);
+        }
+        // The committing action: stand still and take no damage for the whole
+        // window, because starting teleports you to spawn. The snapshot is
+        // only taken once the countdown completes, so cancelling costs nothing.
+        StartCountdown countdown = new StartCountdown(id, now + freezeSeconds * 1000L);
+        pendingStarts.put(id, countdown);
+        player.sendMessage(config.format("confirm-freeze-start",
+                Map.of("seconds", String.valueOf(freezeSeconds))));
+        countdown.lastShown = freezeSeconds;
+        showFreezeTitle(player, freezeSeconds);
+        return true;
+    }
+
+    /**
+     * The run actually begins: snapshot, clear, teleport to spawn, quest 1.
+     * Called either instantly (freeze disabled) or when a start countdown
+     * completes cleanly.
+     */
+    private boolean finishStart(Player player, long now) {
+        UUID id = player.getUniqueId();
         Snapshot snapshot;
         try {
             snapshot = snapshots.takeSnapshot(player);
@@ -137,6 +186,72 @@ public final class SessionManager {
         leaderboard.runStarted(id);
         assignQuest(player, session, now);
         return true;
+    }
+
+    // ------------------------------------------------------------------
+    // Start freeze (anti-combat-escape)
+    // ------------------------------------------------------------------
+
+    /** True while the player's run start is counting down (movement locked). */
+    public boolean isStartFrozen(UUID id) {
+        return pendingStarts.containsKey(id);
+    }
+
+    /**
+     * Cancel a pending run start. The player keeps everything: no snapshot
+     * was taken and no session was created.
+     *
+     * @param messageKey config message to send the player, or null for silent
+     * @return true if a countdown was actually active
+     */
+    public boolean cancelStartCountdown(UUID id, String messageKey) {
+        if (pendingStarts.remove(id) == null) {
+            return false;
+        }
+        if (messageKey != null) {
+            Player player = Bukkit.getPlayer(id);
+            if (player != null && player.isOnline()) {
+                player.sendMessage(config.format(messageKey, Map.of()));
+            }
+        }
+        return true;
+    }
+
+    /** Tick every second: show the countdown title, or start the run. */
+    public void tickStartCountdowns(long now) {
+        if (pendingStarts.isEmpty()) {
+            return;
+        }
+        var it = pendingStarts.entrySet().iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            UUID id = entry.getKey();
+            StartCountdown countdown = entry.getValue();
+            Player player = Bukkit.getPlayer(id);
+            if (player == null || !player.isOnline()) {
+                // Logout cancels via the freeze listener; this is the safety net.
+                it.remove();
+                continue;
+            }
+            long remainingMs = countdown.endMs - now;
+            if (remainingMs <= 0) {
+                it.remove();
+                finishStart(player, now);
+                continue;
+            }
+            int seconds = (int) ((remainingMs + 999) / 1000);
+            if (seconds != countdown.lastShown) {
+                countdown.lastShown = seconds;
+                showFreezeTitle(player, seconds);
+            }
+        }
+    }
+
+    private void showFreezeTitle(Player player, int seconds) {
+        String sec = String.valueOf(seconds);
+        player.showTitle(Title.title(
+                LEGACY.deserialize(config.message("confirm-freeze-title").replace("{seconds}", sec)),
+                LEGACY.deserialize(config.message("confirm-freeze-subtitle").replace("{seconds}", sec))));
     }
 
     /**

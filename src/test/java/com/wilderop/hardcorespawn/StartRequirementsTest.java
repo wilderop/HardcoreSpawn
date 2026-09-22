@@ -38,6 +38,8 @@ class StartRequirementsTest extends PluginTestBase {
 
         assertFalse(sessions().hasSession(player.getUniqueId()),
                 "run must not start when close to 0,0 with items");
+        assertFalse(sessions().isStartFrozen(player.getUniqueId()),
+                "denied confirm must not start a countdown either");
         assertEquals(Material.DIAMOND, player.getInventory().getItem(0).getType(),
                 "inventory must be untouched after denial");
         assertEquals(before.getX(), player.getLocation().getX(), 0.001,
@@ -87,6 +89,8 @@ class StartRequirementsTest extends PluginTestBase {
         player.getEnderChest().clear();
         assertTrue(sessions().meetsStartRequirements(player), "player should be fully empty now");
         player.performCommand("hardcore confirm");
+        // The confirm starts the stand-still countdown; fast-forward it.
+        sessions().tickStartCountdowns(System.currentTimeMillis() + 15_000);
         assertTrue(sessions().hasSession(player.getUniqueId()),
                 "confirm should succeed once the requirement is met");
     }

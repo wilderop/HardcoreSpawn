@@ -23,6 +23,11 @@ start:
   min-distance: 2000.0   # XZ blocks from the center required to start with items
   center-x: 0.0
   center-z: 0.0
+  # Anti-combat-escape: /hardcore confirm starts a stand-still countdown
+  # instead of starting instantly (starting teleports you to spawn). Take no
+  # damage and don't move for the whole window, or the start is cancelled.
+  # 0 disables the freeze (runs start instantly, as before).
+  freeze-seconds: 10
 
 # What happens when the quest timer runs out: escalating damage, then death.
 timeout:
@@ -90,6 +95,11 @@ messages:
   start-denied-too-close: "§cTravel at least {radius} blocks from ({center-x}, {center-z}), or empty your inventory and ender chest first."
   already-running: "§cYou are already in a hardcore run!"
   teleport-failed: "§cCould not teleport you to spawn. Run cancelled — your inventory was restored."
+  confirm-freeze-start: "§eStand still for {seconds} seconds! Take no damage and your run will begin."
+  confirm-freeze-title: "§c§l{seconds}"
+  confirm-freeze-subtitle: "§eStay still!"
+  confirm-freeze-active: "§cYour run is already counting down — stay still!"
+  confirm-freeze-cancelled: "§cYou took damage! The run did not start. Type /hardcore to try again."
   run-started: "§aHardcore run started! Quest 1: §e{quest} §7({time} left)"
   new-quest: "§aQuest {level}: §e{quest} §7({time} left)"
   quest-complete: "§aQuest complete!"

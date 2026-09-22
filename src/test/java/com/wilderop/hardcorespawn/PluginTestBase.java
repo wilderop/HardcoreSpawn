@@ -60,10 +60,13 @@ public abstract class PluginTestBase {
         return plugin.getSessionManager();
     }
 
-    /** Full /hardcore -> /hardcore confirm flow. */
+    /** Full /hardcore -> /hardcore confirm flow, fast-forwarding the start freeze. */
     protected void startRun(PlayerMock player) {
         assert player.performCommand("hardcore") : "hardcore command failed";
         assert player.performCommand("hardcore confirm") : "hardcore confirm failed";
+        // /hardcore confirm starts a stand-still countdown; jump past it.
+        sessions().tickStartCountdowns(System.currentTimeMillis()
+                + sessions().getConfig().getStartFreezeSeconds() * 1000L + 5000);
         assert sessions().hasSession(player.getUniqueId()) : "no session after confirm";
     }
 }

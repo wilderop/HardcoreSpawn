@@ -14,8 +14,13 @@ everything you gained is gone.
 ## Gameplay
 
 - **Start**: `/hardcore` shows a confirmation prompt; `/hardcore confirm`
-  begins the run within 60 seconds. You are teleported to the server spawn
-  with nothing. No free healing — you start exactly as hurt/hungry as you were.
+  begins the run within 60 seconds. **Anti-combat-escape:** confirming starts
+  a 10-second stand-still countdown (configurable via `start.freeze-seconds`;
+  big title countdown on your screen). Move, teleport, or take any damage
+  during it and the start is cancelled with nothing lost — starting teleports
+  you to the server spawn, so it can't be a getaway. Survive the countdown and
+  you are teleported to the server spawn with nothing. No free healing — you
+  start exactly as hurt/hungry as you were.
 - **Start precondition**: you may only start if your XZ distance from
   `(0, 0)` **in the overworld** is at least `2000` blocks (configurable),
   **unless** your inventory (storage, armor, offhand, cursor item) **and**
@@ -56,7 +61,7 @@ everything you gained is gone.
 | Command | Permission | Description |
 |---|---|---|
 | `/hardcore` | `hardcore.use` | Show the confirmation prompt |
-| `/hardcore confirm` | `hardcore.use` | Start the run (within 60 s) |
+| `/hardcore confirm` | `hardcore.use` | Start the 10 s stand-still countdown (within 60 s) |
 | `/hardcore quit` | `hardcore.use` | Forfeit the run, restore snapshot |
 | `/hardcore status` | `hardcore.use` | Level, quest progress, time left, best |
 | `/hardcoreadmin reset <player>` | `hardcore.admin` | End a player's run, restore them |

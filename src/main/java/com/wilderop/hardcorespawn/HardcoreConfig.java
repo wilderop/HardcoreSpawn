@@ -59,6 +59,15 @@ public final class HardcoreConfig {
         return cfg.getDouble("start.center-z", 0.0);
     }
 
+    /**
+     * Stand-still seconds on /hardcore confirm before the run starts
+     * (anti-combat-escape: starting teleports you to spawn). 0 or less
+     * disables the freeze and runs start instantly.
+     */
+    public int getStartFreezeSeconds() {
+        return cfg.getInt("start.freeze-seconds", 10);
+    }
+
     public double getTimeoutDamage() {
         return cfg.getDouble("timeout.damage", 1.0);
     }
