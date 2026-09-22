@@ -36,6 +36,15 @@ class MilestoneRewardTest extends PluginTestBase {
         return false;
     }
 
+    private boolean hasSpawner() {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && item.getType() == Material.SPAWNER) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void completeOneBreakQuest() {
         forceQuest(new QuestObjective(QuestType.BREAK, "OAK_LOG", 1, "Chop 1 oak log"));
         listener.progressBreak(player, "OAK_LOG", 1);
@@ -76,5 +85,43 @@ class MilestoneRewardTest extends PluginTestBase {
 
         assertEquals(60, sessions().getSession(player.getUniqueId()).questsCompleted);
         assertTrue(hasSpawnEgg(), "the milestone should repeat every 30 quests");
+    }
+
+    @Test
+    void spawnerGrantedAtSixtyQuests() {
+        freshRun();
+        Session s = sessions().getSession(player.getUniqueId());
+        s.questsCompleted = 59; // next completion is #60
+        assertFalse(hasSpawner(), "no spawner before the milestone");
+
+        completeOneBreakQuest();
+
+        assertEquals(60, sessions().getSession(player.getUniqueId()).questsCompleted);
+        assertTrue(hasSpawner(), "an empty mob spawner should be granted at 60 quests");
+    }
+
+    @Test
+    void noSpawnerBeforeSixty() {
+        freshRun();
+        Session s = sessions().getSession(player.getUniqueId());
+        s.questsCompleted = 29; // next completion is #30: egg yes, spawner no
+
+        completeOneBreakQuest();
+
+        assertEquals(30, sessions().getSession(player.getUniqueId()).questsCompleted);
+        assertTrue(hasSpawnEgg(), "egg milestone still fires at 30");
+        assertFalse(hasSpawner(), "no spawner before 60 quests");
+    }
+
+    @Test
+    void spawnerGrantedAgainAtOneTwenty() {
+        freshRun();
+        Session s = sessions().getSession(player.getUniqueId());
+        s.questsCompleted = 119; // next completion is #120
+
+        completeOneBreakQuest();
+
+        assertEquals(120, sessions().getSession(player.getUniqueId()).questsCompleted);
+        assertTrue(hasSpawner(), "the spawner milestone should repeat every 60 quests");
     }
 }

@@ -87,11 +87,30 @@ class ConfigMigrationTest extends PluginTestBase {
         assertTrue(ConfigMigrator.migrateIfNeeded(dir, LOG, bundled()), "migration should run");
 
         YamlConfiguration migrated = YamlConfiguration.loadConfiguration(new File(dir, "config.yml"));
-        assertEquals(3, migrated.getInt("config-version"));
+        assertEquals(ConfigMigrator.CURRENT_VERSION, migrated.getInt("config-version"));
         assertEquals(600, migrated.getInt("quest-time-seconds"), "user settings must carry over");
         assertTrue(migrated.isSet("discord-webhook-url"),
                 "migrated config must contain the discord-webhook-url key");
         assertEquals("", migrated.getString("discord-webhook-url"));
+    }
+
+    @Test
+    void v3ConfigKeepsWebhookUrlOnMigration(@TempDir File dir) throws Exception {
+        // A v3 config with a real webhook URL migrates to v4 without losing it.
+        String v3 = "config-version: 3\n"
+                + "discord-webhook-url: \"https://example.com/real-hook\"\n"
+                + "messages:\n"
+                + "  run-started: \"old\"\n";
+        Files.write(new File(dir, "config.yml").toPath(), v3.getBytes(StandardCharsets.UTF_8));
+
+        assertTrue(ConfigMigrator.migrateIfNeeded(dir, LOG, bundled()), "migration should run");
+
+        YamlConfiguration migrated = YamlConfiguration.loadConfiguration(new File(dir, "config.yml"));
+        assertEquals(ConfigMigrator.CURRENT_VERSION, migrated.getInt("config-version"));
+        assertEquals("https://example.com/real-hook", migrated.getString("discord-webhook-url"),
+                "webhook URL must survive migration");
+        assertTrue(migrated.isSet("milestone-spawner-every"),
+                "migrated config must contain the spawner milestone key");
     }
 
     @Test

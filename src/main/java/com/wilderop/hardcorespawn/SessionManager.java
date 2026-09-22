@@ -519,6 +519,10 @@ public final class SessionManager {
         if (every > 0 && s.questsCompleted % every == 0) {
             grantMilestoneEgg(player, s.questsCompleted);
         }
+        int spawnerEvery = config.getMilestoneSpawnerEvery();
+        if (spawnerEvery > 0 && s.questsCompleted % spawnerEvery == 0) {
+            grantMilestoneSpawner(player, s.questsCompleted);
+        }
         List<String> excluded = new ArrayList<>(completed.templateIds());
         for (Quest q : s.hand) {
             excluded.addAll(q.templateIds());
@@ -558,6 +562,25 @@ public final class SessionManager {
             player.sendMessage(config.format("milestone-egg", Map.of(
                     "count", String.valueOf(questsCompleted),
                     "mob", mobName)));
+        }
+    }
+
+    /**
+     * Milestone prize: an empty mob spawner block. Right-clicking it with a
+     * spawn egg sets what it spawns, so it pairs with the milestone eggs.
+     * Like all run loot it must be banked in a world chest or it is lost on
+     * death; a full inventory drops it at the player's feet.
+     */
+    private void grantMilestoneSpawner(Player player, int questsCompleted) {
+        ItemStack stack = new ItemStack(Material.SPAWNER, 1);
+        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
+        if (!leftover.isEmpty()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), stack);
+            player.sendMessage(config.format("milestone-spawner-dropped", Map.of(
+                    "count", String.valueOf(questsCompleted))));
+        } else {
+            player.sendMessage(config.format("milestone-spawner", Map.of(
+                    "count", String.valueOf(questsCompleted))));
         }
     }
 

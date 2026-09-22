@@ -41,6 +41,13 @@ public final class HardcoreConfig {
         return cfg.getInt("milestone-egg-every", 30);
     }
 
+    /**
+     * Every N completed quests grants an empty mob spawner block (0 disables).
+     */
+    public int getMilestoneSpawnerEvery() {
+        return cfg.getInt("milestone-spawner-every", 60);
+    }
+
     public double getDifficultyGrowth() {
         return cfg.getDouble("difficulty-growth", 1.3);
     }
