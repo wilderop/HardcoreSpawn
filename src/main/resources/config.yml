@@ -5,6 +5,9 @@
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
 
+# Every N completed quests grants a random mob spawn egg (0 disables).
+milestone-egg-every: 30
+
 # How quest amounts scale per level: amount = base * growth^(level-1)
 difficulty-growth: 1.3
 
@@ -104,6 +107,8 @@ messages:
   new-quest: "§aNew quest: §e{quest} §7({time} left)\n§7Your 3 quests:\n{quests}"
   your-quests: "§7Your 3 quests:\n{quests}\n§7({time} left)"
   quest-complete: "§aQuest complete! The clock resets — pick your next quest!"
+  milestone-egg: "§6★ Milestone! §e{count} quests completed — you earned a §b{mob} Spawn Egg§e!"
+  milestone-egg-dropped: "§6★ Milestone! §e{count} quests completed — your §b{mob} Spawn Egg§e dropped at your feet (inventory full)!"
   quit: "§cYou forfeited your run at level {level}. Your original inventory was restored; everything you gained is gone."
   death: "§cYour hardcore run ended at level {level}. Your original inventory was restored; everything you gained is gone."
   disconnect-death: "§cYou were gone too long. Your hardcore run ended at level {level}."

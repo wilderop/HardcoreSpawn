@@ -34,6 +34,13 @@ public final class HardcoreConfig {
         return cfg.getInt("quest-time-seconds", 300);
     }
 
+    /**
+     * Every N completed quests grants a random mob spawn egg (0 disables).
+     */
+    public int getMilestoneEggEvery() {
+        return cfg.getInt("milestone-egg-every", 30);
+    }
+
     public double getDifficultyGrowth() {
         return cfg.getDouble("difficulty-growth", 1.3);
     }

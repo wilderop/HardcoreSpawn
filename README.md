@@ -42,6 +42,10 @@ everything you gained is gone.
   countdown; warnings at 1:00 and 0:30. When time runs out you take
   half-heart damage every 10 seconds for 30 seconds, then you die.
   There are no quest rewards and no healing — only progress.
+- **Milestone prize**: every 30 completed quests (configurable via
+  `milestone-egg-every`, 0 disables) grants a random mob spawn egg —
+  pig, wolf, axolotl, sniffer, and friends. Like any other run gain, it is
+  lost on death unless you bank it in a world chest first.
 - **Banking**: only physical world chests can bank your gains. Your ender
   chest is wiped at run start, **cannot be opened during a run**, and is
   restored when the run ends.

@@ -48,6 +48,20 @@ public final class SessionManager {
 
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
 
+    /**
+     * Fun, non-boss mobs a milestone spawn egg can become. Kept to
+     * passive/neutral mobs so the prize can't be weaponized mid-run.
+     */
+    private static final List<Material> MILESTONE_EGGS = List.of(
+            Material.PIG_SPAWN_EGG, Material.COW_SPAWN_EGG, Material.SHEEP_SPAWN_EGG,
+            Material.CHICKEN_SPAWN_EGG, Material.HORSE_SPAWN_EGG, Material.WOLF_SPAWN_EGG,
+            Material.CAT_SPAWN_EGG, Material.PARROT_SPAWN_EGG, Material.FOX_SPAWN_EGG,
+            Material.PANDA_SPAWN_EGG, Material.BEE_SPAWN_EGG, Material.AXOLOTL_SPAWN_EGG,
+            Material.GOAT_SPAWN_EGG, Material.FROG_SPAWN_EGG, Material.CAMEL_SPAWN_EGG,
+            Material.SNIFFER_SPAWN_EGG, Material.ARMADILLO_SPAWN_EGG, Material.MOOSHROOM_SPAWN_EGG,
+            Material.DONKEY_SPAWN_EGG, Material.LLAMA_SPAWN_EGG, Material.RABBIT_SPAWN_EGG,
+            Material.TURTLE_SPAWN_EGG, Material.OCELOT_SPAWN_EGG, Material.DOLPHIN_SPAWN_EGG);
+
     private final HardcoreSpawn plugin;
     private HardcoreConfig config;
     private final SnapshotManager snapshots;
@@ -453,6 +467,10 @@ public final class SessionManager {
         s.level++;
         s.questsCompleted++;
         player.sendMessage(config.format("quest-complete", Map.of()));
+        int every = config.getMilestoneEggEvery();
+        if (every > 0 && s.questsCompleted % every == 0) {
+            grantMilestoneEgg(player, s.questsCompleted);
+        }
         List<String> excluded = new ArrayList<>(completed.templateIds());
         for (Quest q : s.hand) {
             excluded.addAll(q.templateIds());
@@ -471,9 +489,40 @@ public final class SessionManager {
         saveSessions();
     }
 
-    // ------------------------------------------------------------------
-    // Unified exit path
-    // ------------------------------------------------------------------
+    /**
+     * Milestone prize: a random mob spawn egg. It lands in the run inventory
+     * like any other gain — lost on death unless banked in a world chest.
+     */
+    private void grantMilestoneEgg(Player player, int questsCompleted) {
+        Material egg = MILESTONE_EGGS.get(
+                java.util.concurrent.ThreadLocalRandom.current().nextInt(MILESTONE_EGGS.size()));
+        ItemStack stack = new ItemStack(egg, 1);
+        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
+        String mobName = toMobName(egg);
+        if (!leftover.isEmpty()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), stack);
+            player.sendMessage(config.format("milestone-egg-dropped", Map.of(
+                    "count", String.valueOf(questsCompleted),
+                    "mob", mobName)));
+        } else {
+            player.sendMessage(config.format("milestone-egg", Map.of(
+                    "count", String.valueOf(questsCompleted),
+                    "mob", mobName)));
+        }
+    }
+
+    /** PIG_SPAWN_EGG -> "Pig", MOOSHROOM_SPAWN_EGG -> "Mooshroom". */
+    private static String toMobName(Material egg) {
+        String base = egg.name().replace("_SPAWN_EGG", "");
+        String[] parts = base.toLowerCase(java.util.Locale.ROOT).split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1)).append(' ');
+            }
+        }
+        return sb.toString().trim();
+    }
 
     /**
      * End a run for any reason. Restores the pre-run snapshot, forfeits run
