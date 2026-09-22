@@ -2,16 +2,24 @@ package com.wilderop.hardcorespawn;
 
 import org.bukkit.Location;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /** Mutable state of one active hardcore run. */
 public final class Session {
+    /** How many quests are offered at once. Complete any one to reset the timer. */
+    public static final int HAND_SIZE = 3;
+
     public final UUID playerId;
     public final Location returnLocation;
 
     public int level;                 // quests completed
     public int questsCompleted;
-    public Quest quest;               // current quest (quest.level() == level + 1)
+    /** The active quest hand: up to HAND_SIZE quests. Completing any one
+     *  resets the quest clock and replaces the completed quest with a new one,
+     *  so the player always has options. */
+    public final List<Quest> hand = new ArrayList<>();
     public long questDeadlineMs;      // epoch millis; 0 = paused across a restart
     public long offlineSinceMs;       // 0 = online
     public boolean warned60;

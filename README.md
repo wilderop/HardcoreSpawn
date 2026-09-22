@@ -27,8 +27,11 @@ everything you gained is gone.
   ender chest are both completely empty. Outside the overworld the distance
   rule can never be satisfied, so only fully-empty players may start there.
   This keeps players from farming a run next to their base.
-- **Quests**: endless, generated per level (~1.3× scaling per level, never
-  the same template twice in a row):
+- **Quests**: you are dealt a hand of **3 quests at a time** — complete
+  **any one** of them to reset the 5-minute timer. Each completion deals a
+  fresh quest into the hand (never duplicating the other two), so you always
+  have options. Quests are endless and generated per level (~1.3× scaling
+  per level, never the same template twice in a row):
   - Levels 1–3: gathering (logs, cobble, dirt…)
   - Levels 4–6: iron, crafting, zombies
   - Levels 7–9: skeletons, diamonds, obsidian

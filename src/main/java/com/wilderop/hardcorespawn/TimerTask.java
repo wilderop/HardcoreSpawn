@@ -28,8 +28,8 @@ public final class TimerTask extends BukkitRunnable {
         // Run-start countdowns tick even though their players have no session yet.
         sessions.tickStartCountdowns(now);
         for (Session s : sessions.sessionsSnapshot()) {
-            if (s.questDeadlineMs == 0 || s.quest == null) {
-                continue; // paused across a restart, or no quest assigned yet
+            if (s.questDeadlineMs == 0 || s.hand.isEmpty()) {
+                continue; // paused across a restart, or no quests assigned yet
             }
             Player player = Bukkit.getPlayer(s.playerId);
             // The session's own offline marker is authoritative: a quit event
@@ -52,7 +52,7 @@ public final class TimerTask extends BukkitRunnable {
             s = current;
 
             long remaining = s.questDeadlineMs - now;
-            sessions.getHud().updateHud(player, s.quest.level(), remaining);
+            sessions.getHud().updateHud(player, SessionManager.reachedLevel(s), remaining);
 
             if (!s.warned60 && remaining <= 60_000 && remaining > 0) {
                 s.warned60 = true;

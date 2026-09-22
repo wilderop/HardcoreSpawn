@@ -184,7 +184,7 @@ public final class SessionManager {
         // no advantage.)
 
         leaderboard.runStarted(id);
-        assignQuest(player, session, now);
+        assignInitialHand(player, session, now);
         return true;
     }
 
@@ -332,55 +332,95 @@ public final class SessionManager {
     // Quests
     // ------------------------------------------------------------------
 
-    private void assignQuest(Player player, Session session, long now) {
-        List<String> last = session.quest == null ? List.of() : session.quest.templateIds();
-        Quest quest = quests.generate(session.level + 1, last);
-        session.quest = quest;
-        long questMs = config.getQuestTimeSeconds() * 1000L;
-        session.questDeadlineMs = now + questMs;
+    /**
+     * Deal the opening hand of HAND_SIZE quests (all level 1, no shared
+     * templates) and start the quest clock.
+     */
+    private void assignInitialHand(Player player, Session session, long now) {
+        List<String> excluded = new ArrayList<>();
+        for (int i = 0; i < Session.HAND_SIZE; i++) {
+            Quest q = quests.generate(1, excluded);
+            session.hand.add(q);
+            excluded.addAll(q.templateIds());
+        }
+        resetQuestClock(session, now);
+        hud.showRunHud(player, reachedLevel(session), config.getQuestTimeSeconds() * 1000L);
+        player.sendMessage(config.format("run-started", Map.of(
+                "quests", formatHand(session),
+                "time", config.formatTime(config.getQuestTimeSeconds() * 1000L))));
+    }
+
+    /** Reset the shared quest deadline and clear timeout state. */
+    private void resetQuestClock(Session session, long now) {
+        session.questDeadlineMs = now + config.getQuestTimeSeconds() * 1000L;
         session.warned60 = false;
         session.warned30 = false;
         session.timeoutDamagePhase = false;
-        hud.showRunHud(player, quest.level(), questMs);
-        String key = session.level == 0 ? "run-started" : "new-quest";
-        player.sendMessage(config.format(key, Map.of(
-                "quest", quest.getDescription(),
-                "time", config.formatTime(questMs),
-                "level", String.valueOf(quest.level()))));
+    }
+
+    /** Numbered list of the active hand with progress, for chat messages. */
+    private static String formatHand(Session s) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.hand.size(); i++) {
+            Quest q = s.hand.get(i);
+            if (i > 0) {
+                sb.append('\n');
+            }
+            sb.append("§e").append(i + 1).append(". §f").append(q.getDescription())
+                    .append(" §7(").append(q.getProgressText()).append(')');
+        }
+        return sb.toString();
     }
 
     public void addProgress(Player player, QuestType type, String target, int amount) {
         Session s = sessions.get(player.getUniqueId());
-        if (s == null || s.quest == null) {
+        if (s == null || s.hand.isEmpty()) {
             return;
         }
-        if (s.quest.progress(type, target, amount)) {
-            if (s.quest.isComplete()) {
-                advanceQuest(player);
-            } else {
-                hud.updateHud(player, s.quest.level(), s.questDeadlineMs - System.currentTimeMillis());
+        boolean moved = false;
+        List<Quest> completed = new ArrayList<>();
+        for (Quest q : new ArrayList<>(s.hand)) {
+            if (q.progress(type, target, amount)) {
+                moved = true;
+                if (q.isComplete()) {
+                    completed.add(q);
+                }
             }
+        }
+        if (!completed.isEmpty()) {
+            for (Quest q : completed) {
+                completeQuest(player, s, q);
+            }
+        } else if (moved) {
+            hud.updateHud(player, reachedLevel(s), s.questDeadlineMs - System.currentTimeMillis());
         }
     }
 
     /** Scan the inventory for OBTAIN objectives. Called every tick. */
     public void checkObtain(Player player) {
         Session s = sessions.get(player.getUniqueId());
-        if (s == null || s.quest == null) {
+        if (s == null || s.hand.isEmpty()) {
             return;
         }
         boolean moved = false;
-        for (QuestObjective o : s.quest.objectives()) {
-            if (o.type() == QuestType.OBTAIN && !o.isComplete()) {
-                int count = countMaterial(player, o.target());
-                if (count != o.progress()) {
-                    o.setProgress(count);
-                    moved = true;
+        for (Quest q : s.hand) {
+            for (QuestObjective o : q.objectives()) {
+                if (o.type() == QuestType.OBTAIN && !o.isComplete()) {
+                    int count = countMaterial(player, o.target());
+                    if (count != o.progress()) {
+                        o.setProgress(count);
+                        moved = true;
+                    }
                 }
             }
         }
-        if (moved && s.quest.isComplete()) {
-            advanceQuest(player);
+        if (!moved) {
+            return;
+        }
+        for (Quest q : new ArrayList<>(s.hand)) {
+            if (q.isComplete()) {
+                completeQuest(player, s, q);
+            }
         }
     }
 
@@ -400,15 +440,35 @@ public final class SessionManager {
         return count;
     }
 
-    public void advanceQuest(Player player) {
-        Session s = sessions.get(player.getUniqueId());
-        if (s == null) {
+    /**
+     * One quest from the hand was completed: level up, reset the shared
+     * quest clock, and deal a replacement so the hand stays full. The new
+     * quest excludes the templates of the other two active quests (and of
+     * the one just completed) so it never duplicates an option in the hand.
+     */
+    public void completeQuest(Player player, Session s, Quest completed) {
+        if (!s.hand.remove(completed)) {
             return;
         }
         s.level++;
         s.questsCompleted++;
         player.sendMessage(config.format("quest-complete", Map.of()));
-        assignQuest(player, s, System.currentTimeMillis());
+        List<String> excluded = new ArrayList<>(completed.templateIds());
+        for (Quest q : s.hand) {
+            excluded.addAll(q.templateIds());
+        }
+        Quest replacement = quests.generate(s.level + 1, excluded);
+        s.hand.add(replacement);
+        long now = System.currentTimeMillis();
+        resetQuestClock(s, now);
+        long questMs = config.getQuestTimeSeconds() * 1000L;
+        hud.showRunHud(player, reachedLevel(s), questMs);
+        player.sendMessage(config.format("new-quest", Map.of(
+                "quest", replacement.getDescription(),
+                "quests", formatHand(s),
+                "time", config.formatTime(questMs),
+                "level", String.valueOf(replacement.level()))));
+        saveSessions();
     }
 
     // ------------------------------------------------------------------
@@ -531,12 +591,16 @@ public final class SessionManager {
     }
 
     /**
-     * The level the player actually reached (the current quest's level), used
-     * for messages, the leaderboard, and restores. Dying on quest 1 counts as
-     * reaching level 1, not level 0.
+     * The level the player actually reached (the highest quest level in the
+     * hand), used for messages, the leaderboard, and restores. A fresh run
+     * with a hand of level-1 quests counts as reaching level 1, not level 0.
      */
     static int reachedLevel(Session s) {
-        return s.quest != null ? s.quest.level() : s.level;
+        int max = 0;
+        for (Quest q : s.hand) {
+            max = Math.max(max, q.level());
+        }
+        return max > 0 ? max : s.level;
     }
 
     // ------------------------------------------------------------------
@@ -590,8 +654,11 @@ public final class SessionManager {
                 if (s.timeoutDamagePhase) {
                     s.nextDamageMs = now; // don't punish the restart gap
                 }
-                if (s.quest != null) {
-                    hud.showRunHud(player, s.quest.level(), s.questDeadlineMs - now);
+                if (!s.hand.isEmpty()) {
+                    hud.showRunHud(player, reachedLevel(s), s.questDeadlineMs - now);
+                    player.sendMessage(config.format("your-quests", Map.of(
+                            "quests", formatHand(s),
+                            "time", config.formatTime(s.questDeadlineMs - now))));
                 }
                 player.sendMessage(config.format("welcome-back-paused", Map.of()));
             }
@@ -603,8 +670,11 @@ public final class SessionManager {
             endRun(id, ExitCause.DISCONNECT_TIMEOUT);
         } else {
             s.offlineSinceMs = 0;
-            if (s.quest != null) {
-                hud.showRunHud(player, s.quest.level(), s.questDeadlineMs - now);
+            if (!s.hand.isEmpty()) {
+                hud.showRunHud(player, reachedLevel(s), s.questDeadlineMs - now);
+                player.sendMessage(config.format("your-quests", Map.of(
+                        "quests", formatHand(s),
+                        "time", config.formatTime(s.questDeadlineMs - now))));
             }
             player.sendMessage(config.format("welcome-back", Map.of()));
             saveSessions();
@@ -658,7 +728,7 @@ public final class SessionManager {
 
     public void sendStatus(Player player) {
         Session s = sessions.get(player.getUniqueId());
-        if (s == null || s.quest == null) {
+        if (s == null || s.hand.isEmpty()) {
             player.sendMessage(config.format("no-session", Map.of()));
             return;
         }
@@ -668,7 +738,7 @@ public final class SessionManager {
                 : config.formatTime(s.questDeadlineMs - System.currentTimeMillis());
         player.sendMessage(config.format("status", Map.of(
                 "level", String.valueOf(reachedLevel(s)),
-                "quest", s.quest.getDescription() + " §7(" + s.quest.getProgressText() + ")",
+                "quests", formatHand(s),
                 "time", time,
                 "best", String.valueOf(stats.bestLevel),
                 "runs", String.valueOf(stats.totalRuns))));
@@ -730,20 +800,26 @@ public final class SessionManager {
             yaml.set(key + ".return.z", r.getZ());
             yaml.set(key + ".return.yaw", r.getYaw());
             yaml.set(key + ".return.pitch", r.getPitch());
-            if (s.quest != null) {
-                yaml.set(key + ".quest.level", s.quest.level());
-                yaml.set(key + ".quest.templateIds", s.quest.templateIds());
-                List<Map<String, Object>> objectives = new ArrayList<>();
-                for (QuestObjective o : s.quest.objectives()) {
-                    Map<String, Object> m = new HashMap<>();
-                    m.put("type", o.type().name());
-                    m.put("target", o.target());
-                    m.put("amount", o.amount());
-                    m.put("progress", o.progress());
-                    m.put("description", o.description());
-                    objectives.add(m);
+            if (!s.hand.isEmpty()) {
+                List<Map<String, Object>> questList = new ArrayList<>();
+                for (Quest q : s.hand) {
+                    Map<String, Object> questMap = new HashMap<>();
+                    questMap.put("level", q.level());
+                    questMap.put("templateIds", q.templateIds());
+                    List<Map<String, Object>> objectives = new ArrayList<>();
+                    for (QuestObjective o : q.objectives()) {
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("type", o.type().name());
+                        m.put("target", o.target());
+                        m.put("amount", o.amount());
+                        m.put("progress", o.progress());
+                        m.put("description", o.description());
+                        objectives.add(m);
+                    }
+                    questMap.put("objectives", objectives);
+                    questList.add(questMap);
                 }
-                yaml.set(key + ".quest.objectives", objectives);
+                yaml.set(key + ".quests", questList);
             }
         }
         try {
@@ -799,20 +875,29 @@ public final class SessionManager {
                 s.warned30 = yaml.getBoolean(key + ".warned30");
                 s.timeoutDamagePhase = yaml.getBoolean(key + ".timeoutDamagePhase");
                 s.nextDamageMs = yaml.getLong(key + ".nextDamageMs");
-                if (yaml.contains(key + ".quest")) {
+                if (yaml.contains(key + ".quests")) {
+                    for (Map<?, ?> qm : (List<Map<?, ?>>) (List<?>) yaml.getMapList(key + ".quests")) {
+                        s.hand.add(readQuest(qm));
+                    }
+                } else if (yaml.contains(key + ".quest")) {
+                    // Legacy single-quest format (v1.0.0): read it, then deal
+                    // the remaining quests to restore a full hand.
                     int qLevel = yaml.getInt(key + ".quest.level");
                     List<String> templateIds = yaml.getStringList(key + ".quest.templateIds");
                     List<QuestObjective> objectives = new ArrayList<>();
                     for (Map<?, ?> m : (List<Map<?, ?>>) (List<?>) yaml.getMapList(key + ".quest.objectives")) {
-                        QuestObjective o = new QuestObjective(
-                                QuestType.valueOf(String.valueOf(m.get("type"))),
-                                String.valueOf(m.get("target")),
-                                ((Number) m.get("amount")).intValue(),
-                                String.valueOf(m.get("description")));
-                        o.setProgress(((Number) m.get("progress")).intValue());
-                        objectives.add(o);
+                        objectives.add(readObjective(m));
                     }
-                    s.quest = new Quest(qLevel, templateIds, objectives);
+                    s.hand.add(new Quest(qLevel, templateIds, objectives));
+                }
+                // The hand must always be full: top up after a legacy load or
+                // if a quest was somehow lost between save and load.
+                while (s.hand.size() < Session.HAND_SIZE) {
+                    List<String> excluded = new ArrayList<>();
+                    for (Quest q : s.hand) {
+                        excluded.addAll(q.templateIds());
+                    }
+                    s.hand.add(quests.generate(s.level + 1, excluded));
                 }
                 // Only restore if the snapshot still exists; otherwise the run is unrecoverable.
                 if (snapshots.hasSnapshot(id)) {
@@ -825,6 +910,29 @@ public final class SessionManager {
             }
         }
         plugin.getLogger().info("Restored " + sessions.size() + " hardcore session(s) from disk.");
+    }
+
+    private static Quest readQuest(Map<?, ?> qm) {
+        int qLevel = ((Number) qm.get("level")).intValue();
+        @SuppressWarnings("unchecked")
+        List<String> templateIds = (List<String>) (List<?>) qm.get("templateIds");
+        List<QuestObjective> objectives = new ArrayList<>();
+        @SuppressWarnings("unchecked")
+        List<Map<?, ?>> raw = (List<Map<?, ?>>) (List<?>) qm.get("objectives");
+        for (Map<?, ?> m : raw) {
+            objectives.add(readObjective(m));
+        }
+        return new Quest(qLevel, templateIds, objectives);
+    }
+
+    private static QuestObjective readObjective(Map<?, ?> m) {
+        QuestObjective o = new QuestObjective(
+                QuestType.valueOf(String.valueOf(m.get("type"))),
+                String.valueOf(m.get("target")),
+                ((Number) m.get("amount")).intValue(),
+                String.valueOf(m.get("description")));
+        o.setProgress(((Number) m.get("progress")).intValue());
+        return o;
     }
 
     /** Package-private so listeners can persist after consuming a restore. */

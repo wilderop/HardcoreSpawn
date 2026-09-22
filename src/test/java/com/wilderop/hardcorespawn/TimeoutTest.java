@@ -18,8 +18,9 @@ class TimeoutTest extends PluginTestBase {
         startRun(player);
         Session s = sessions().getSession(player.getUniqueId());
         // Force an OBTAIN quest so checkObtain can't accidentally complete it.
-        s.quest = new Quest(1, List.of("t"), List.of(
-                new QuestObjective(QuestType.OBTAIN, "NETHERITE_BLOCK", 64, "impossible")));
+        s.hand.clear();
+        s.hand.add(new Quest(1, List.of("t"), List.of(
+                new QuestObjective(QuestType.OBTAIN, "NETHERITE_BLOCK", 64, "impossible"))));
 
         double fullHealth = player.getHealth();
         long now = System.currentTimeMillis();
@@ -68,8 +69,9 @@ class TimeoutTest extends PluginTestBase {
         PlayerMock player = newPlayer();
         startRun(player);
         Session s = sessions().getSession(player.getUniqueId());
-        s.quest = new Quest(1, List.of("t"), List.of(
-                new QuestObjective(QuestType.OBTAIN, "DIAMOND", 1, "Hold 1 diamond")));
+        s.hand.clear();
+        s.hand.add(new Quest(1, List.of("t"), List.of(
+                new QuestObjective(QuestType.OBTAIN, "DIAMOND", 1, "Hold 1 diamond"))));
         player.getInventory().setItem(0, new ItemStack(Material.DIAMOND, 1));
 
         TimerTask task = new TimerTask(sessions());
