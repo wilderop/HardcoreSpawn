@@ -4,8 +4,9 @@
 
 # Config schema version. If your config is older than the plugin's, it is
 # backed up to config.yml.bak on startup: your settings carry over, but the
-# messages section is refreshed to the new format. Never change this yourself.
-config-version: 1
+# messages section and the quest bands are refreshed to the new format.
+# Never change this yourself.
+config-version: 2
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
@@ -50,8 +51,9 @@ timeout:
 # Quest bands. Each band covers a level range and holds quest templates.
 # Template fields:
 #   id          unique within the band (used for no-repeat logic)
-#   type        BREAK | CRAFT | SMELT | KILL | OBTAIN
-#   target      Material name (BREAK/CRAFT/SMELT/OBTAIN) or EntityType (KILL)
+#   type        BREAK | CRAFT | SMELT | KILL | OBTAIN | TRAVEL
+#   target      Material name (BREAK/CRAFT/SMELT/OBTAIN), EntityType (KILL),
+#               or anything (TRAVEL ignores it; convention is BLOCKS)
 #   base-amount amount at level 1, scaled by difficulty-growth per level
 #   description shown to the player; {amount} and {target} are replaced
 # ------------------------------------------------------------------
@@ -64,6 +66,7 @@ bands:
       - { id: mine_coal,   type: BREAK, target: COAL_ORE,    base-amount: 16, description: "Mine {amount} coal ore" }
       - { id: dig_dirt,    type: BREAK, target: DIRT,        base-amount: 64, description: "Dig {amount} dirt" }
       - { id: craft_planks,type: CRAFT, target: OAK_PLANKS,  base-amount: 64, description: "Craft {amount} oak planks" }
+      - { id: hike_500,    type: TRAVEL, target: BLOCKS,     base-amount: 500, description: "Travel {amount} blocks on foot" }
   - min-level: 4
     max-level: 6
     quests:

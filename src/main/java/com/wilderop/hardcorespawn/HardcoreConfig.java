@@ -125,6 +125,8 @@ public final class HardcoreConfig {
                     QuestType qt = QuestType.valueOf(type);
                     if (qt == QuestType.KILL) {
                         EntityType.valueOf(target);
+                    } else if (qt == QuestType.TRAVEL) {
+                        // No target validation: travel distance needs no material.
                     } else {
                         Material.valueOf(target);
                     }

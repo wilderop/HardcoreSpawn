@@ -10,6 +10,8 @@ public enum QuestType {
     SMELT,
     /** Kill entities of the target type (killer must be the runner). */
     KILL,
+    /** Travel the target distance in blocks on foot. */
+    TRAVEL,
     /** Hold the target amount of the material in your inventory at once. */
     OBTAIN
 }

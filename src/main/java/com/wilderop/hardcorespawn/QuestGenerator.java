@@ -68,6 +68,23 @@ public final class QuestGenerator {
     }
 
     /**
+     * Build a quest from the first template of the given type in the band for
+     * this level. Used for the guaranteed easy starter quest. Returns null
+     * when the band has no such template (the caller should fall back).
+     */
+    public Quest generateByType(int level, QuestType type) {
+        Band band = bandFor(level);
+        for (QuestTemplate t : band.templates) {
+            if (t.type() == type) {
+                int amount = t.amountForLevel(level, growth);
+                return new Quest(level, List.of(t.id()),
+                        List.of(new QuestObjective(t.type(), t.target(), amount, t.describe(amount))));
+            }
+        }
+        return null;
+    }
+
+    /**
      * Generate the quest for the given 1-based level.
      *
      * @param level            quest level (quests completed + 1)

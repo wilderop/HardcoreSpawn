@@ -16,15 +16,17 @@ import java.util.logging.Logger;
  * <p>Bukkit never overwrites an existing config.yml, so after an update the
  * server can be left with stale message formats whose placeholders the new
  * code no longer fills (showing literal text like {@code {quest}} to
- * players). To prevent that: if the on-disk config's {@code config-version}
- * is older than {@link #CURRENT_VERSION}, the old file is backed up to
+ * players), or missing quest templates the new code expects. To prevent
+ * that: if the on-disk config's {@code config-version} is older than
+ * {@link #CURRENT_VERSION}, the old file is backed up to
  * {@code config.yml.bak}, a fresh default is written, and the user's
- * non-message settings are carried over. The {@code messages} section is
- * always refreshed so its placeholders match the code.
+ * non-message, non-quest settings are carried over. The {@code messages}
+ * and {@code bands} sections are always refreshed so placeholders match the
+ * code and new quest types are available.
  */
 public final class ConfigMigrator {
     /** Bump this whenever the bundled config changes incompatibly. */
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
 
     private ConfigMigrator() {}
 
@@ -56,7 +58,7 @@ public final class ConfigMigrator {
 
         logger.warning("[HardcoreSpawn] config.yml is from an older version; migrating. "
                 + "The old file is backed up to config.yml.bak. Your settings carry over, "
-                + "but customized messages are reset to the new format.");
+                + "but customized messages and quest bands are reset to the new format.");
 
         File backup = new File(dataFolder, "config.yml.bak");
         try {
@@ -70,10 +72,10 @@ public final class ConfigMigrator {
         if (fresh == null) {
             return false;
         }
-        // Carry over the user's settings; messages and the version stamp always
-        // come from the fresh default.
+        // Carry over the user's settings; messages, quest bands, and the
+        // version stamp always come from the fresh default.
         for (String key : fresh.getKeys(false)) {
-            if (key.equals("messages") || key.equals("config-version")) {
+            if (key.equals("messages") || key.equals("bands") || key.equals("config-version")) {
                 continue;
             }
             if (current.isSet(key)) {

@@ -1,5 +1,10 @@
 package com.wilderop.hardcorespawn;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -7,6 +12,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.FurnaceExtractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.inventory.ItemStack;
 
 /**
@@ -80,5 +86,42 @@ public final class QuestListener implements Listener {
 
     public void progressKill(Player player, String entityType, int amount) {
         sessions.addProgress(player, QuestType.KILL, entityType, amount);
+    }
+
+    // ------------------------------------------------------------------
+    // TRAVEL progress: credit whole blocks of horizontal distance walked.
+    // Fractional distance accumulates per player so diagonal/short steps
+    // still count; teleports and world changes grant nothing.
+    // ------------------------------------------------------------------
+    private final Map<UUID, Double> travelRemainder = new HashMap<>();
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        UUID id = player.getUniqueId();
+        if (!sessions.hasTravelObjective(id)) {
+            travelRemainder.remove(id); // lazy cleanup; nothing to earn
+            return;
+        }
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (from.getWorld() == null || !from.getWorld().equals(to.getWorld())) {
+            travelRemainder.put(id, 0.0);
+            return;
+        }
+        double dx = to.getX() - from.getX();
+        double dz = to.getZ() - from.getZ();
+        double dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist <= 0.0 || dist > 16.0) {
+            return; // standing still, or a glitch jump / teleport-like leap
+        }
+        double accumulated = travelRemainder.getOrDefault(id, 0.0) + dist;
+        int whole = (int) accumulated;
+        if (whole > 0) {
+            travelRemainder.put(id, accumulated - whole);
+            sessions.addProgress(player, QuestType.TRAVEL, "BLOCKS", whole);
+        } else {
+            travelRemainder.put(id, accumulated);
+        }
     }
 }

@@ -352,7 +352,18 @@ public final class SessionManager {
      */
     private void assignInitialHand(Player player, Session session, long now) {
         List<String> excluded = new ArrayList<>();
-        for (int i = 0; i < Session.HAND_SIZE; i++) {
+        // One guaranteed easy starter: travel on foot. On anarchy servers the
+        // land near spawn is stripped bare, so a gathering quest first is brutal.
+        Quest starter = quests.generateByType(1, QuestType.TRAVEL);
+        if (starter == null) {
+            // Custom config without a travel template: keep the easy starter anyway.
+            starter = new Quest(1, List.of("builtin-travel"),
+                    List.of(new QuestObjective(QuestType.TRAVEL, "BLOCKS", 500,
+                            "Travel 500 blocks on foot")));
+        }
+        session.hand.add(starter);
+        excluded.addAll(starter.templateIds());
+        for (int i = 1; i < Session.HAND_SIZE; i++) {
             Quest q = quests.generate(1, excluded);
             session.hand.add(q);
             excluded.addAll(q.templateIds());
@@ -384,6 +395,22 @@ public final class SessionManager {
                     .append(" §7(").append(q.getProgressText()).append(')');
         }
         return sb.toString();
+    }
+
+    /** True when the player has an incomplete TRAVEL objective in their hand. */
+    public boolean hasTravelObjective(UUID id) {
+        Session s = sessions.get(id);
+        if (s == null || s.hand.isEmpty()) {
+            return false;
+        }
+        for (Quest q : s.hand) {
+            for (QuestObjective o : q.objectives()) {
+                if (o.type() == QuestType.TRAVEL && !o.isComplete()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public void addProgress(Player player, QuestType type, String target, int amount) {
