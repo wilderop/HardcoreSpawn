@@ -2,6 +2,11 @@
 # HardcoreSpawn configuration
 # ------------------------------------------------------------------
 
+# Config schema version. If your config is older than the plugin's, it is
+# backed up to config.yml.bak on startup: your settings carry over, but the
+# messages section is refreshed to the new format. Never change this yourself.
+config-version: 1
+
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
 

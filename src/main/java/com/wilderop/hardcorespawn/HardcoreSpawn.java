@@ -14,7 +14,9 @@ public class HardcoreSpawn extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
+        // Migrates a stale config.yml (backup + settings preserved) instead of
+        // leaving old message formats with placeholders the code no longer fills.
+        ConfigMigrator.migrateIfNeeded(getDataFolder(), getLogger(), () -> getResource("config.yml"));
         reloadHardcoreConfig();
 
         snapshotManager = new SnapshotManager(getDataFolder(), getLogger());
