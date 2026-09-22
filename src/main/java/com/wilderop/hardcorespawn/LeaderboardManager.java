@@ -5,6 +5,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -42,6 +43,28 @@ public final class LeaderboardManager {
         s.bestLevel = Math.max(s.bestLevel, level);
         s.totalQuests += questsCompleted;
         save();
+    }
+
+    /** Test support: drop all records (memory and disk). */
+    void clear() {
+        stats.clear();
+        if (file.exists()) {
+            file.delete();
+        }
+    }
+
+    /** Top players by best level (ties broken by total quests), up to limit. */
+    public List<Map.Entry<UUID, Stats>> topByBestLevel(int limit) {
+        return stats.entrySet().stream()
+                .sorted((a, b) -> {
+                    int cmp = Integer.compare(b.getValue().bestLevel, a.getValue().bestLevel);
+                    if (cmp != 0) {
+                        return cmp;
+                    }
+                    return Long.compare(b.getValue().totalQuests, a.getValue().totalQuests);
+                })
+                .limit(limit)
+                .toList();
     }
 
     private void load() {

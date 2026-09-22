@@ -873,6 +873,31 @@ public final class SessionManager {
                 "runs", String.valueOf(stats.totalRuns))));
     }
 
+    /** Show the top players by best level. */
+    public void sendLeaderboard(Player player) {
+        List<Map.Entry<UUID, LeaderboardManager.Stats>> top =
+                leaderboard.topByBestLevel(10);
+        if (top.isEmpty()) {
+            player.sendMessage(config.format("leaderboard-empty", Map.of()));
+            return;
+        }
+        player.sendMessage(config.format("leaderboard-header", Map.of()));
+        int rank = 1;
+        for (Map.Entry<UUID, LeaderboardManager.Stats> e : top) {
+            String name = Bukkit.getOfflinePlayer(e.getKey()).getName();
+            if (name == null) {
+                name = e.getKey().toString().substring(0, 8);
+            }
+            LeaderboardManager.Stats st = e.getValue();
+            player.sendMessage(config.format("leaderboard-entry", Map.of(
+                    "rank", String.valueOf(rank++),
+                    "name", name,
+                    "best", String.valueOf(st.bestLevel),
+                    "quests", String.valueOf(st.totalQuests),
+                    "runs", String.valueOf(st.totalRuns))));
+        }
+    }
+
     /** Mark all sessions offline and persist (called on disable). */
     public void shutdown() {
         long now = System.currentTimeMillis();

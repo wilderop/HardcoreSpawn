@@ -6,7 +6,7 @@
 # backed up to config.yml.bak on startup: your settings carry over, but the
 # messages section and the quest bands are refreshed to the new format.
 # Never change this yourself.
-config-version: 4
+config-version: 5
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
@@ -122,6 +122,9 @@ messages:
   run-started: "§aHardcore run started! Complete §eone §aof these 3 quests before time runs out:\n{quests}\n§7({time} on the clock)"
   new-quest: "§aNew quest: §e{quest} §7({time} left)\n§7Your 3 quests:\n{quests}"
   your-quests: "§7Your 3 quests:\n{quests}\n§7({time} left)"
+  leaderboard-header: "§6§lHardcore Leaderboard §7(top 10 by best level)"
+  leaderboard-entry: "§e#{rank} §f{name} §7— best level §e{best}§7, {quests} quests in {runs} runs"
+  leaderboard-empty: "§7No hardcore runs recorded yet. Type §e/hardcore §7if you dare."
   quest-complete: "§aQuest complete! The clock resets — pick your next quest!"
   milestone-egg: "§6★ Milestone! §e{count} quests completed — you earned a §b{mob} Spawn Egg§e!"
   milestone-egg-dropped: "§6★ Milestone! §e{count} quests completed — your §b{mob} Spawn Egg§e dropped at your feet (inventory full)!"
