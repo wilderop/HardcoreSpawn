@@ -1,0 +1,16 @@
+[00:58:01 INFO]: [PluginRemapper] Remapping plugin 'plugins/HardcoreSpawn-1.0.0.jar'...
+[00:58:01 INFO]: [PluginRemapper] Done remapping plugin 'plugins/HardcoreSpawn-1.0.0.jar' in 262ms.
+ - HardcoreSpawn (1.0.0)
+[00:58:20 INFO]: [HardcoreSpawn] Loading server plugin HardcoreSpawn v1.0.0
+[00:58:43 INFO]: [HardcoreSpawn] Enabling HardcoreSpawn v1.0.0
+[00:58:43 INFO]: [HardcoreSpawn] HardcoreSpawn enabled: type /hardcore if you dare.
+[00:58:44 INFO]: Done (60.002s)! For help, type "help"
+[00:58:58 INFO]: ? Server Plugins (1):
+[00:58:58 INFO]: Bukkit Plugins:
+[00:58:58 INFO]:  - HardcoreSpawn
+[00:59:05 INFO]: --------- Help: /hardcore -----------------------------
+[00:59:05 INFO]: Description: Enter, manage, or forfeit a hardcore run.
+[00:59:05 INFO]: Usage: /hardcore [confirm|quit|status]
+[00:59:12 INFO]: [HardcoreSpawn] Disabling HardcoreSpawn v1.0.0
+[00:59:12 INFO]: [HardcoreSpawn] HardcoreSpawn disabled.
+EXIT: 0

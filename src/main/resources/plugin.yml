@@ -1,0 +1,22 @@
+name: HardcoreSpawn
+version: 1.0.0
+main: com.wilderop.hardcorespawn.HardcoreSpawn
+api-version: '1.21'
+author: wilderop
+description: Endless escalating hardcore quest mode. Type /hardcore if you dare.
+commands:
+  hardcore:
+    description: Enter, manage, or forfeit a hardcore run.
+    usage: /hardcore [confirm|quit|status]
+    permission: hardcore.use
+  hardcoreadmin:
+    description: Administer HardcoreSpawn runs.
+    usage: /hardcoreadmin <reset <player>|reload>
+    permission: hardcore.admin
+permissions:
+  hardcore.use:
+    description: Allows starting and managing your own hardcore runs.
+    default: true
+  hardcore.admin:
+    description: Allows resetting other players' runs and reloading config.
+    default: op
