@@ -192,7 +192,7 @@ class TravelQuestTest extends PluginTestBase {
         assertTrue(ConfigMigrator.migrateIfNeeded(dir, LOG, bundled()), "migration should run");
 
         YamlConfiguration migrated = YamlConfiguration.loadConfiguration(new File(dir, "config.yml"));
-        assertEquals(2, migrated.getInt("config-version"));
+        assertEquals(ConfigMigrator.CURRENT_VERSION, migrated.getInt("config-version"));
         assertEquals(600, migrated.getInt("quest-time-seconds"),
                 "user settings must carry over");
 

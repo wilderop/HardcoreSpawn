@@ -73,4 +73,39 @@ class ConfigMigrationTest extends PluginTestBase {
                 "a current config must not be migrated");
         assertFalse(new File(dir, "config.yml.bak").exists(), "no backup should be made");
     }
+
+    @Test
+    void v2ConfigGainsDiscordWebhookKey(@TempDir File dir) throws Exception {
+        // A v2 config (pre-webhook, like a 1.4.0 server's) migrates to v3 and
+        // gains the discord-webhook-url key with the empty default.
+        String v2 = "config-version: 2\n"
+                + "quest-time-seconds: 600\n"
+                + "messages:\n"
+                + "  run-started: \"old\"\n";
+        Files.write(new File(dir, "config.yml").toPath(), v2.getBytes(StandardCharsets.UTF_8));
+
+        assertTrue(ConfigMigrator.migrateIfNeeded(dir, LOG, bundled()), "migration should run");
+
+        YamlConfiguration migrated = YamlConfiguration.loadConfiguration(new File(dir, "config.yml"));
+        assertEquals(3, migrated.getInt("config-version"));
+        assertEquals(600, migrated.getInt("quest-time-seconds"), "user settings must carry over");
+        assertTrue(migrated.isSet("discord-webhook-url"),
+                "migrated config must contain the discord-webhook-url key");
+        assertEquals("", migrated.getString("discord-webhook-url"));
+    }
+
+    @Test
+    void manuallySetWebhookUrlSurvivesMigration(@TempDir File dir) throws Exception {
+        String v2 = "config-version: 2\n"
+                + "discord-webhook-url: \"https://example.com/manual-hook\"\n"
+                + "messages:\n"
+                + "  run-started: \"old\"\n";
+        Files.write(new File(dir, "config.yml").toPath(), v2.getBytes(StandardCharsets.UTF_8));
+
+        assertTrue(ConfigMigrator.migrateIfNeeded(dir, LOG, bundled()), "migration should run");
+
+        YamlConfiguration migrated = YamlConfiguration.loadConfiguration(new File(dir, "config.yml"));
+        assertEquals("https://example.com/manual-hook", migrated.getString("discord-webhook-url"),
+                "a manually added webhook URL must carry over");
+    }
 }
