@@ -16,6 +16,8 @@ public final class Session {
 
     public int level;                 // quests completed
     public int questsCompleted;
+    /** Epoch millis when the run actually started (after the start freeze). */
+    public long runStartedMs;
     /** The active quest hand: up to HAND_SIZE quests. Completing any one
      *  resets the quest clock and replaces the completed quest with a new one,
      *  so the player always has options. */

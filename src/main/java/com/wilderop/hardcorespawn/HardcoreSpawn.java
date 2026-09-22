@@ -23,6 +23,8 @@ public class HardcoreSpawn extends JavaPlugin {
         leaderboardManager = new LeaderboardManager(getDataFolder(), getLogger());
         sessionManager = new SessionManager(this, hardcoreConfig, snapshotManager,
                 questGenerator, leaderboardManager, hudService);
+        sessionManager.setDiscordNotifier(
+                new DiscordNotifier(hardcoreConfig.getDiscordWebhookUrl(), getLogger()));
         sessionManager.loadSessions();
         sessionManager.loadRestores();
 
@@ -65,6 +67,8 @@ public class HardcoreSpawn extends JavaPlugin {
         questGenerator = QuestGenerator.fromConfig(hardcoreConfig);
         if (sessionManager != null) {
             sessionManager.setConfig(hardcoreConfig, questGenerator);
+            sessionManager.setDiscordNotifier(
+                    new DiscordNotifier(hardcoreConfig.getDiscordWebhookUrl(), getLogger()));
         }
     }
 

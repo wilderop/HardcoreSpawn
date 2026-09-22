@@ -24,6 +24,10 @@ multi-objective-min-level: 13
 # Rejoin within the grace period to resume; after it, the run is dead.
 disconnect-grace-seconds: 60
 
+# Discord webhook URL for run notifications (run started, quest completed,
+# run ended). Empty disables. Paste your webhook URL here to enable.
+discord-webhook-url: ""
+
 # Starting a run requires being far from the overworld center (anti-farming),
 # unless the player's inventory (including armor and offhand) AND ender
 # chest are both completely empty. Outside the overworld the distance rule

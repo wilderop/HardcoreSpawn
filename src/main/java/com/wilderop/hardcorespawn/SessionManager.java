@@ -68,6 +68,12 @@ public final class SessionManager {
     private QuestGenerator quests;
     private final LeaderboardManager leaderboard;
     private HudService hud;
+    private DiscordNotifier discord = new DiscordNotifier("", null) {
+        @Override
+        protected void postJson(String json) {
+            // Disabled by default until HardcoreSpawn wires the real one.
+        }
+    };
 
     private final Map<UUID, Session> sessions = new HashMap<>();
     private final Map<UUID, Long> pendingConfirms = new HashMap<>();
@@ -93,6 +99,11 @@ public final class SessionManager {
     /** Test seam: swap the HUD (e.g. for a headless mock server). */
     public void setHudService(HudService hud) {
         this.hud = hud;
+    }
+
+    /** (Re)build the Discord notifier from the current config. */
+    public void setDiscordNotifier(DiscordNotifier discord) {
+        this.discord = discord;
     }
 
     public HardcoreConfig getConfig() { return config; }
@@ -198,8 +209,18 @@ public final class SessionManager {
         // no advantage.)
 
         leaderboard.runStarted(id);
+        session.runStartedMs = now;
         assignInitialHand(player, session, now);
+        discord.sendRunStarted(player.getName(), questDescriptions(session));
         return true;
+    }
+
+    private List<String> questDescriptions(Session s) {
+        List<String> descriptions = new ArrayList<>();
+        for (Quest q : s.hand) {
+            descriptions.add(q.getDescription());
+        }
+        return descriptions;
     }
 
     // ------------------------------------------------------------------
@@ -494,6 +515,8 @@ public final class SessionManager {
         s.level++;
         s.questsCompleted++;
         player.sendMessage(config.format("quest-complete", Map.of()));
+        discord.sendQuestCompleted(player.getName(), completed.getDescription(),
+                s.questsCompleted, reachedLevel(s));
         int every = config.getMilestoneEggEvery();
         if (every > 0 && s.questsCompleted % every == 0) {
             grantMilestoneEgg(player, s.questsCompleted);
@@ -598,6 +621,9 @@ public final class SessionManager {
 
         hud.hideHud(id);
         leaderboard.runFinished(id, reached, s.questsCompleted);
+        String playerName = player != null ? player.getName() : id.toString();
+        discord.sendRunEnded(playerName, cause, reached, s.questsCompleted,
+                System.currentTimeMillis() - s.runStartedMs);
         saveSessions();
     }
 
@@ -865,6 +891,7 @@ public final class SessionManager {
             String key = s.playerId.toString();
             yaml.set(key + ".level", s.level);
             yaml.set(key + ".questsCompleted", s.questsCompleted);
+            yaml.set(key + ".runStartedMs", s.runStartedMs);
             yaml.set(key + ".offlineSinceMs", s.offlineSinceMs);
             yaml.set(key + ".deadlineMs", s.questDeadlineMs);
             yaml.set(key + ".pausedRemainingMs", s.pausedQuestRemainingMs);
@@ -933,6 +960,7 @@ public final class SessionManager {
                 Session s = new Session(id, ret);
                 s.level = yaml.getInt(key + ".level");
                 s.questsCompleted = yaml.getInt(key + ".questsCompleted");
+                s.runStartedMs = yaml.getLong(key + ".runStartedMs", now);
                 // Sessions are always loaded paused: restart downtime counts
                 // against neither the quest clock nor the disconnect grace.
                 // questDeadlineMs == 0 marks a paused session; the remaining

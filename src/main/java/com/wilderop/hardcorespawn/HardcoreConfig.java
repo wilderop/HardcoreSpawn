@@ -53,6 +53,13 @@ public final class HardcoreConfig {
         return cfg.getInt("disconnect-grace-seconds", 60);
     }
 
+    /**
+     * Discord webhook URL for run notifications. Empty (default) disables.
+     */
+    public String getDiscordWebhookUrl() {
+        return cfg.getString("discord-webhook-url", "");
+    }
+
     /** XZ blocks from the center a player must be to start a run while carrying items. */
     public double getStartMinDistance() {
         return cfg.getDouble("start.min-distance", 2000.0);
