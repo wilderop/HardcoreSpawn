@@ -515,8 +515,6 @@ public final class SessionManager {
         s.level++;
         s.questsCompleted++;
         player.sendMessage(config.format("quest-complete", Map.of()));
-        discord.sendQuestCompleted(player.getName(), completed.getDescription(),
-                s.questsCompleted, reachedLevel(s));
         int every = config.getMilestoneEggEvery();
         if (every > 0 && s.questsCompleted % every == 0) {
             grantMilestoneEgg(player, s.questsCompleted);
@@ -527,6 +525,8 @@ public final class SessionManager {
         }
         Quest replacement = quests.generate(s.level + 1, excluded);
         s.hand.add(replacement);
+        discord.sendQuestCompleted(player.getName(), completed.getDescription(),
+                replacement.getDescription(), s.questsCompleted, reachedLevel(s));
         long now = System.currentTimeMillis();
         resetQuestClock(s, now);
         long questMs = config.getQuestTimeSeconds() * 1000L;

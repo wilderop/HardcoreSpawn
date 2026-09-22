@@ -57,8 +57,9 @@ public class DiscordNotifier {
         postEmbed(embed);
     }
 
-    /** One quest in the hand was completed. */
+    /** One quest in the hand was completed; a replacement quest is dealt. */
     public void sendQuestCompleted(String playerName, String questDescription,
+                                   String newQuestDescription,
                                    int questsCompleted, int newLevel) {
         if (!isEnabled()) {
             return;
@@ -67,6 +68,7 @@ public class DiscordNotifier {
                 "\u2705 " + playerName + " completed a quest");
         embed.addProperty("description", questDescription);
         embed.add("fields", fields(
+                field("New quest", newQuestDescription, false),
                 field("Quests completed", String.valueOf(questsCompleted), true),
                 field("Level", String.valueOf(newLevel), true)));
         postEmbed(embed);

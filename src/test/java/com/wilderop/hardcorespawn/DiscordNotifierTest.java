@@ -35,7 +35,7 @@ class DiscordNotifierTest extends PluginTestBase {
         RecordingNotifier n = new RecordingNotifier("");
         assertFalse(n.isEnabled());
         n.sendRunStarted("Steve", List.of("Travel 500 blocks"));
-        n.sendQuestCompleted("Steve", "Break 10 oak logs", 1, 2);
+        n.sendQuestCompleted("Steve", "Break 10 oak logs", "Smelt 5 iron ingots", 1, 2);
         n.sendRunEnded("Steve", ExitCause.IN_WORLD_DEATH, 3, 2, 60_000);
         assertTrue(n.payloads.isEmpty(), "disabled notifier must send nothing");
     }
@@ -54,12 +54,13 @@ class DiscordNotifierTest extends PluginTestBase {
     @Test
     void questCompletedPayload() {
         RecordingNotifier n = new RecordingNotifier("https://example.com/hook");
-        n.sendQuestCompleted("Alex", "Smelt 5 iron ingots", 4, 5);
+        n.sendQuestCompleted("Alex", "Smelt 5 iron ingots", "Tame a horse", 4, 5);
         assertEquals(1, n.payloads.size());
         String json = n.payloads.get(0);
         assertTrue(json.contains("Alex completed a quest"), json);
         assertTrue(json.contains("Smelt 5 iron ingots"), json);
-        assertTrue(json.contains("Quests completed"), json);
+        assertTrue(json.contains("Tame a horse"), json);
+        assertTrue(json.contains("New quest"), json);
     }
 
     @Test
@@ -101,6 +102,7 @@ class DiscordNotifierTest extends PluginTestBase {
         sessions().completeQuest(player, s, travel);
         assertEquals(2, rec.payloads.size(), "quest completion should notify Discord");
         assertTrue(rec.payloads.get(1).contains("completed a quest"), rec.payloads.get(1));
+        assertTrue(rec.payloads.get(1).contains("New quest"), rec.payloads.get(1));
 
         sessions().endRun(player.getUniqueId(), ExitCause.IN_WORLD_DEATH);
         assertEquals(3, rec.payloads.size(), "run end should notify Discord");
