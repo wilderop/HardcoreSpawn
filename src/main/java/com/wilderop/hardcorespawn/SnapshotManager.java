@@ -101,12 +101,21 @@ public final class SnapshotManager {
     /** Capture the player's full state and persist it. Throws SnapshotException on failure. */
     public Snapshot takeSnapshot(Player player) {
         Snapshot s = new Snapshot();
+        // Capture the cursor before closing the inventory below: closing must
+        // not be allowed to eat it (MockBukkit's closeInventory nulls it,
+        // though real servers keep it).
+        s.cursorB64 = encodeItems(new ItemStack[]{player.getItemOnCursor()});
+        // Close any open inventory first: the 2x2 crafting grid is not part of
+        // the player inventory contents, so its items must be returned to the
+        // inventory before the snapshot or they would bypass it.
+        player.closeInventory();
         s.inventoryB64 = encodeItems(player.getInventory().getContents());
         s.armorB64 = encodeItems(player.getInventory().getArmorContents());
         s.offhandB64 = encodeItems(new ItemStack[]{player.getInventory().getItemInOffHand()});
         s.enderChestB64 = encodeItems(player.getEnderChest().getContents());
         s.expLevel = player.getLevel();
         s.expProgress = player.getExp();
+        s.expTotal = player.getTotalExperience();
         Location loc = player.getLocation();
         s.worldName = loc.getWorld().getName();
         s.x = loc.getX();
@@ -131,17 +140,32 @@ public final class SnapshotManager {
         player.getInventory().setArmorContents(decodeItems(s.armorB64, 4));
         ItemStack[] offhand = decodeItems(s.offhandB64, 1);
         player.getInventory().setItemInOffHand(offhand[0]);
+        if (s.cursorB64 != null) { // snapshots predating the cursor fix have no entry
+            ItemStack[] cursor = decodeItems(s.cursorB64, 1);
+            player.setItemOnCursor(cursor[0]);
+        }
         player.getEnderChest().setContents(decodeItems(s.enderChestB64, player.getEnderChest().getContents().length));
+        if (s.expTotal >= 0) {
+            // Restore the total first: setTotalExperience recalculates level
+            // and progress from it, keeping all three consistent.
+            player.setTotalExperience(s.expTotal);
+        }
+        // Re-assert the snapshotted level/progress on top: the total and the
+        // level can disagree (e.g. setLevel without giveExp), and the visible
+        // XP bar is level + progress, which is what the player expects back.
+        // (For legacy snapshots without expTotal this is the whole restore.)
         player.setLevel(s.expLevel);
         player.setExp(s.expProgress);
         forget(player.getUniqueId());
     }
 
-    /** Wipe inventory, armor, offhand, ender chest, and XP so the run starts with nothing. */
+    /** Wipe inventory, armor, offhand, cursor, ender chest, and XP so the run starts with nothing. */
     public void clearPlayer(Player player) {
+        player.closeInventory(); // return crafting-grid items to the inventory first
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItemInOffHand(null);
+        player.setItemOnCursor(null);
         player.getEnderChest().clear();
         player.setLevel(0);
         player.setExp(0);
@@ -174,7 +198,13 @@ public final class SnapshotManager {
         memory.remove(id);
         Map<String, Object> all = loadAll();
         if (all.remove(id.toString()) != null) {
-            saveAll(all);
+            try {
+                saveAll(all);
+            } catch (SnapshotException e) {
+                // Memory is already updated; a stale disk entry is only
+                // resurrected on restart and is fail-open (never wipes).
+                logger.severe("Could not update snapshots.yml: " + e.getMessage());
+            }
         }
     }
 
@@ -241,7 +271,10 @@ public final class SnapshotManager {
             file.getParentFile().mkdirs();
             yaml.save(file);
         } catch (IOException e) {
-            logger.severe("Could not save snapshots.yml: " + e.getMessage());
+            // Fail loudly: takeSnapshot() propagates this so a run is never
+            // started when its snapshot could not be persisted — otherwise a
+            // crash before the next save would lose the only durable copy.
+            throw new SnapshotException("Could not save snapshots.yml", e);
         }
     }
 }

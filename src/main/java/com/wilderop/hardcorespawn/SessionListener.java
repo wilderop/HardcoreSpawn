@@ -57,6 +57,14 @@ public final class SessionListener implements Listener {
         if (offhand != null && !offhand.getType().isAir()) {
             world.dropItemNaturally(loc, offhand);
         }
+        // The cursor item is not reliably part of the event drops, so forfeit
+        // it explicitly. This is dupe-safe: the vanilla drops were cleared
+        // above, so exactly one copy is spawned however the event was built.
+        ItemStack cursor = player.getItemOnCursor();
+        if (cursor != null && !cursor.getType().isAir()) {
+            world.dropItemNaturally(loc, cursor.clone());
+            player.setItemOnCursor(null);
+        }
         sessions.endRun(player.getUniqueId(), ExitCause.IN_WORLD_DEATH);
     }    private void dropAll(World world, Location loc, ItemStack[] items) {
         for (ItemStack item : items) {

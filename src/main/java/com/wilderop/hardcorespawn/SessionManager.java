@@ -120,7 +120,16 @@ public final class SessionManager {
         snapshots.clearPlayer(player);
 
         Location spawn = spawnLocation();
-        player.teleport(spawn);
+        if (!player.teleport(spawn)) {
+            // The spawn teleport failed or was cancelled: roll the run back
+            // entirely rather than leaving the player cleared at their old
+            // location with an active session.
+            sessions.remove(id);
+            snapshots.restore(player, snapshot);
+            plugin.getLogger().warning("Spawn teleport failed for " + player.getName() + "; run cancelled and inventory restored.");
+            player.sendMessage(config.format("teleport-failed", Map.of()));
+            return false;
+        }
         // No free healing: the run starts with whatever health/hunger the
         // player had. (Restoring never heals either, so quitting a run grants
         // no advantage.)
@@ -164,6 +173,12 @@ public final class SessionManager {
         }
         ItemStack offhand = player.getInventory().getItemInOffHand();
         if (offhand != null && !offhand.getType().isAir()) {
+            return false;
+        }
+        // The cursor is not part of the inventory contents: items held there
+        // must not slip through the "fully empty" exception to the start rule.
+        ItemStack cursor = player.getItemOnCursor();
+        if (cursor != null && !cursor.getType().isAir()) {
             return false;
         }
         for (ItemStack item : player.getEnderChest().getContents()) {
@@ -311,9 +326,15 @@ public final class SessionManager {
                 pendingRespawnRestores.put(id, new PendingRestore(snapshot, s.returnLocation, messageKey, reached));
                 saveRestores();
             } else {
-                snapshots.clearPlayer(player);
                 if (snapshot != null) {
+                    snapshots.clearPlayer(player);
                     snapshots.restore(player, snapshot);
+                } else {
+                    // Never wipe a player's inventory when there is nothing to
+                    // restore it from: fail open (they keep everything) rather
+                    // than destroying the pre-run state irrecoverably.
+                    plugin.getLogger().severe("No snapshot for " + player.getName()
+                            + "; ending run WITHOUT wiping inventory to avoid item loss.");
                 }
                 player.teleport(s.returnLocation);
                 player.sendMessage(config.format(messageKey, Map.of("level", String.valueOf(reached))));
@@ -357,8 +378,15 @@ public final class SessionManager {
 
         PendingRestore restore = pendingOfflineRestores.remove(id);
         if (restore != null) {
+            if (player.isDead()) {
+                // Died and the server restarted before respawning: the player
+                // will still be dead on rejoin, so apply the restore at the
+                // respawn event instead of on the corpse right now.
+                pendingRespawnRestores.put(id, restore);
+            } else {
+                applyRestore(player, restore);
+            }
             saveRestores();
-            applyRestore(player, restore);
             return;
         }
 
@@ -455,10 +483,13 @@ public final class SessionManager {
             return;
         }
         LeaderboardManager.Stats stats = leaderboard.stats(player.getUniqueId());
+        String time = s.questDeadlineMs == 0
+                ? "paused"
+                : config.formatTime(s.questDeadlineMs - System.currentTimeMillis());
         player.sendMessage(config.format("status", Map.of(
                 "level", String.valueOf(reachedLevel(s)),
                 "quest", s.quest.getDescription() + " §7(" + s.quest.getProgressText() + ")",
-                "time", config.formatTime(s.questDeadlineMs - System.currentTimeMillis()),
+                "time", time,
                 "best", String.valueOf(stats.bestLevel),
                 "runs", String.valueOf(stats.totalRuns))));
     }

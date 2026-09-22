@@ -26,8 +26,8 @@ public final class TimerTask extends BukkitRunnable {
     void tick(long now) {
         HardcoreConfig config = sessions.getConfig();
         for (Session s : sessions.sessionsSnapshot()) {
-            if (s.questDeadlineMs == 0) {
-                continue; // paused across a restart: frozen until the player rejoins
+            if (s.questDeadlineMs == 0 || s.quest == null) {
+                continue; // paused across a restart, or no quest assigned yet
             }
             Player player = Bukkit.getPlayer(s.playerId);
             // The session's own offline marker is authoritative: a quit event

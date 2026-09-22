@@ -5,7 +5,7 @@ A Paper plugin that turns your world's spawn into a hardcore quest gauntlet.
 ## The idea
 
 Type `/hardcore`, confirm, and everything you own — inventory, armor,
-offhand, XP, **ender chest**, and your current location — is snapshotted and
+offhand, cursor item, XP, **ender chest**, and your current location — is snapshotted and
 locked away. You wake up at the world spawn with empty pockets and a quest
 with a five-minute timer. Finish quests to climb endless levels. Die, quit,
 or vanish for too long, and it's over: your original self is restored and
@@ -18,10 +18,10 @@ everything you gained is gone.
   with nothing. No free healing — you start exactly as hurt/hungry as you were.
 - **Start precondition**: you may only start if your XZ distance from
   `(0, 0)` **in the overworld** is at least `2000` blocks (configurable),
-  **unless** your inventory (storage, armor, offhand) **and** ender chest
-  are both completely empty. Outside the overworld the distance rule can
-  never be satisfied, so only fully-empty players may start there. This
-  keeps players from farming a run next to their base.
+  **unless** your inventory (storage, armor, offhand, cursor item) **and**
+  ender chest are both completely empty. Outside the overworld the distance
+  rule can never be satisfied, so only fully-empty players may start there.
+  This keeps players from farming a run next to their base.
 - **Quests**: endless, generated per level (~1.3× scaling per level, never
   the same template twice in a row):
   - Levels 1–3: gathering (logs, cobble, dirt…)
@@ -80,7 +80,7 @@ Snapshots, sessions, restores, and the leaderboard persist as YAML under
 Requires Java 21 and Maven.
 
 ```bash
-mvn package   # produces target/hardcorespawn-1.0.0.jar
+mvn package   # produces target/HardcoreSpawn-1.0.0.jar
 ```
 
 Drop the jar into your server's `plugins/` folder and restart. Paper
@@ -100,3 +100,6 @@ Drop the jar into your server's `plugins/` folder and restart. Paper
   in the crafting matrix.
 - Spawn interference is accepted: starting a run teleports you to the
   server spawn, and other players there are part of the game.
+- Run starts are fail-safe: if the pre-run snapshot cannot be written to
+  disk, or the spawn teleport fails, the run is cancelled and the player's
+  inventory is restored rather than risking item loss.
