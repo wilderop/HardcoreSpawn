@@ -734,6 +734,10 @@ public final class SessionManager {
         snapshots.clearPlayer(player);
         if (restore.snapshot() != null) {
             snapshots.restore(player, restore.snapshot());
+            if ("death".equals(restore.messageKey())) {
+                // The run death must not reset TIME_SINCE_DEATH or bump DEATHS.
+                snapshots.restoreDeathStats(player, restore.snapshot());
+            }
         }
         player.teleport(restore.returnLocation());
         player.sendMessage(config.format(restore.messageKey(), Map.of("level", String.valueOf(restore.level()))));

@@ -1,6 +1,7 @@
 package com.wilderop.hardcorespawn;
 
 import org.bukkit.Location;
+import org.bukkit.Statistic;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -116,6 +117,8 @@ public final class SnapshotManager {
         s.expLevel = player.getLevel();
         s.expProgress = player.getExp();
         s.expTotal = player.getTotalExperience();
+        s.timeSinceDeath = player.getStatistic(Statistic.TIME_SINCE_DEATH);
+        s.deaths = player.getStatistic(Statistic.DEATHS);
         Location loc = player.getLocation();
         s.worldName = loc.getWorld().getName();
         s.x = loc.getX();
@@ -157,6 +160,21 @@ public final class SnapshotManager {
         player.setLevel(s.expLevel);
         player.setExp(s.expProgress);
         forget(player.getUniqueId());
+    }
+
+    /**
+     * Roll back the death statistics after a run death: the death that ended
+     * the run must not reset TIME_SINCE_DEATH or increment DEATHS. Call this
+     * only on the death path — quitting a run involves no death, so the stats
+     * must keep ticking there.
+     */
+    public void restoreDeathStats(Player player, Snapshot s) {
+        if (s.timeSinceDeath >= 0) {
+            player.setStatistic(Statistic.TIME_SINCE_DEATH, s.timeSinceDeath);
+        }
+        if (s.deaths >= 0) {
+            player.setStatistic(Statistic.DEATHS, s.deaths);
+        }
     }
 
     /** Wipe inventory, armor, offhand, cursor, ender chest, and XP so the run starts with nothing. */

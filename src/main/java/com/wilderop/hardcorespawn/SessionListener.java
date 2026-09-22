@@ -85,6 +85,8 @@ public final class SessionListener implements Listener {
         snapshots.clearPlayer(player);
         if (restore.snapshot() != null) {
             snapshots.restore(player, restore.snapshot());
+            // Respawn restores are death-only: the run death must not count.
+            snapshots.restoreDeathStats(player, restore.snapshot());
         }
         player.sendMessage(config().format(restore.messageKey(), Map.of("level", String.valueOf(restore.level()))));
         sessions.saveRestores();

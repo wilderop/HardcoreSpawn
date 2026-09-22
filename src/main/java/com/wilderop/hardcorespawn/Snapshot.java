@@ -18,6 +18,10 @@ public final class Snapshot {
     public float expProgress;
     /** Total experience points; -1 when absent (snapshots predating this field). */
     public int expTotal = -1;
+    /** Statistic.TIME_SINCE_DEATH at run start; -1 when absent. */
+    public int timeSinceDeath = -1;
+    /** Statistic.DEATHS at run start; -1 when absent. */
+    public int deaths = -1;
     public String worldName;
     public double x, y, z;
     public float yaw, pitch;
@@ -32,6 +36,8 @@ public final class Snapshot {
         m.put("expLevel", expLevel);
         m.put("expProgress", expProgress);
         m.put("expTotal", expTotal);
+        m.put("timeSinceDeath", timeSinceDeath);
+        m.put("deaths", deaths);
         m.put("world", worldName);
         m.put("x", x);
         m.put("y", y);
@@ -54,6 +60,10 @@ public final class Snapshot {
         s.expProgress = ep instanceof Number n ? n.floatValue() : 0f;
         Object et = m.getOrDefault("expTotal", -1);
         s.expTotal = et instanceof Number n ? n.intValue() : -1;
+        Object tsd = m.getOrDefault("timeSinceDeath", -1);
+        s.timeSinceDeath = tsd instanceof Number n ? n.intValue() : -1;
+        Object d = m.getOrDefault("deaths", -1);
+        s.deaths = d instanceof Number n ? n.intValue() : -1;
         s.worldName = (String) m.get("world");
         s.x = ((Number) m.getOrDefault("x", 0)).doubleValue();
         s.y = ((Number) m.getOrDefault("y", 0)).doubleValue();
