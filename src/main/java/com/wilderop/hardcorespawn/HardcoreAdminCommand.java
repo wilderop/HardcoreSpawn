@@ -1,6 +1,7 @@
 package com.wilderop.hardcorespawn;
 
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -9,6 +10,7 @@ import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /** /hardcoreadmin <reset <player>|reload> */
 public final class HardcoreAdminCommand implements CommandExecutor, TabCompleter {
@@ -37,12 +39,30 @@ public final class HardcoreAdminCommand implements CommandExecutor, TabCompleter
                     return true;
                 }
                 Player target = Bukkit.getPlayerExact(args[1]);
-                if (target == null || !sessions.hasSession(target.getUniqueId())) {
-                    sender.sendMessage(config().format("admin-no-player", Map.of("player", args[1])));
+                if (target != null) {
+                    // Online: unchanged behavior — the run ends immediately
+                    // and the player is restored on the spot.
+                    if (!sessions.hasSession(target.getUniqueId())) {
+                        sender.sendMessage(config().format("admin-no-player", Map.of("player", args[1])));
+                        return true;
+                    }
+                    sessions.endRun(target.getUniqueId(), ExitCause.ADMIN_RESET);
+                    sender.sendMessage(config().format("admin-reset", Map.of("player", target.getName())));
                     return true;
                 }
-                sessions.endRun(target.getUniqueId(), ExitCause.ADMIN_RESET);
-                sender.sendMessage(config().format("admin-reset", Map.of("player", target.getName())));
+                // Offline: resolve by name; the restore is queued for next join.
+                OfflinePlayer offline = Bukkit.getOfflinePlayer(args[1]);
+                if (!offline.hasPlayedBefore()) {
+                    sender.sendMessage(config().format("admin-unknown-player", Map.of("player", args[1])));
+                    return true;
+                }
+                UUID id = offline.getUniqueId();
+                String name = offline.getName() != null ? offline.getName() : args[1];
+                if (sessions.resetOfflinePlayer(id)) {
+                    sender.sendMessage(config().format("admin-reset", Map.of("player", name)));
+                } else {
+                    sender.sendMessage(config().format("admin-nothing-to-reset", Map.of("player", name)));
+                }
             }
             case "reload" -> {
                 plugin.reloadHardcoreConfig();

@@ -351,6 +351,71 @@ public final class SessionManager {
     }
 
     /**
+     * Admin reset for an OFFLINE player. Ends any active/paused session and
+     * queues the pre-run snapshot for restore on their next join, so a reset
+     * player always gets their pre-run state back — a reset never deletes
+     * items, it only ends the run.
+     *
+     * <p>Unlike {@link #endRun(UUID, ExitCause)}, this deliberately does NOT
+     * touch the leaderboard: an admin reset is maintenance, not a finished
+     * run.
+     *
+     * @return true if the player had any hardcore data (session or snapshot)
+     *         to reset; false when there was nothing (a queued restore alone
+     *         means the run already ended and is left untouched)
+     */
+    public boolean resetOfflinePlayer(UUID id) {
+        Session s = sessions.remove(id);
+        pendingConfirms.remove(id);
+        // A queued restore means the run already ended; leave it alone —
+        // deleting it would destroy the items it is about to give back.
+        boolean restoreQueued = pendingOfflineRestores.containsKey(id)
+                || pendingRespawnRestores.containsKey(id);
+        Snapshot snapshot = snapshots.peek(id);
+        if (s == null && snapshot == null) {
+            return false;
+        }
+        if (s != null) {
+            if (snapshot != null) {
+                pendingOfflineRestores.put(id,
+                        new PendingRestore(snapshot, s.returnLocation, "quit", reachedLevel(s)));
+            } else {
+                // No snapshot to restore from: drop the run data and let the
+                // player keep whatever their player file holds. Never
+                // fabricate or delete items here.
+                plugin.getLogger().warning("Admin reset for offline player " + id
+                        + ": session existed but no snapshot; run data dropped without restore.");
+            }
+        } else if (!restoreQueued) {
+            // Orphaned snapshot with no session (e.g. a crash between the
+            // snapshot write and the session save): fail open and queue it so
+            // the player gets their items back on next join instead of
+            // losing them.
+            Location loc = snapshotReturnLocation(snapshot);
+            if (loc != null) {
+                pendingOfflineRestores.put(id, new PendingRestore(snapshot, loc, "quit", 0));
+            } else {
+                plugin.getLogger().warning("Admin reset for offline player " + id
+                        + ": snapshot world '" + snapshot.worldName
+                        + "' is missing; snapshot left in place.");
+            }
+        }
+        hud.hideHud(id);
+        saveRestores();
+        saveSessions();
+        return true;
+    }
+
+    /** Rebuild the snapshot's pre-run location, or null if its world is gone. */
+    private Location snapshotReturnLocation(Snapshot snapshot) {
+        World world = Bukkit.getWorld(snapshot.worldName);
+        if (world == null) {
+            return null;
+        }
+        return new Location(world, snapshot.x, snapshot.y, snapshot.z, snapshot.yaw, snapshot.pitch);
+    }
+
+    /**
      * The level the player actually reached (the current quest's level), used
      * for messages, the leaderboard, and restores. Dying on quest 1 counts as
      * reaching level 1, not level 0.
