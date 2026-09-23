@@ -1,3 +1,6 @@
+<!-- azpbmd-live -->
+**Live:** survival
+<!-- /azpbmd-live -->
 # HardcoreSpawn
 
 A Paper plugin that turns your world's spawn into a hardcore quest gauntlet.
