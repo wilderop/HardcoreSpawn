@@ -9,7 +9,7 @@ import java.util.UUID;
 /** Mutable state of one active hardcore run. */
 public final class Session {
     /** How many quests are offered at once. Complete any one to reset the timer. */
-    public static final int HAND_SIZE = 3;
+    public static final int HAND_SIZE = 4;
 
     public final UUID playerId;
     public final Location returnLocation;

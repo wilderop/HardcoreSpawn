@@ -54,7 +54,7 @@ class TravelQuestTest extends PluginTestBase {
 
         Session s = sessions().getSession(player.getUniqueId());
         assertNotNull(s);
-        assertEquals(3, s.hand.size(), "opening hand must have three quests");
+        assertEquals(Session.HAND_SIZE, s.hand.size(), "opening hand must have four quests");
 
         long travelCount = s.hand.stream()
                 .filter(q -> q.objectives().stream().anyMatch(o -> o.type() == QuestType.TRAVEL))
@@ -82,10 +82,10 @@ class TravelQuestTest extends PluginTestBase {
             listener.onPlayerMove(new PlayerMoveEvent(player, from, loc.clone()));
         }
 
-        // Completing it deals a replacement: hand stays at three, travel quest gone.
+        // Completing it deals a replacement: hand stays full, travel quest gone.
         Session s = sessions().getSession(id);
         assertNotNull(s, "run must still be active");
-        assertEquals(3, s.hand.size());
+        assertEquals(Session.HAND_SIZE, s.hand.size());
         assertNull(travelQuest(player), "travel quest must be completed and replaced");
     }
 

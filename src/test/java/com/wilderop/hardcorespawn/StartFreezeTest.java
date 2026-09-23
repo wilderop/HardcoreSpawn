@@ -83,7 +83,7 @@ class StartFreezeTest extends PluginTestBase {
         assertEquals(0.5, player.getLocation().getX(), 0.001, "must be teleported to spawn");
         assertEquals(0.5, player.getLocation().getZ(), 0.001, "must be teleported to spawn");
         Session session = sessions().getSession(id);
-        assertEquals(Session.HAND_SIZE, session.hand.size(), "a hand of 3 quests must be dealt");
+        assertEquals(Session.HAND_SIZE, session.hand.size(), "a full hand of quests must be dealt");
         for (Quest q : session.hand) {
             assertEquals(1, q.level());
         }

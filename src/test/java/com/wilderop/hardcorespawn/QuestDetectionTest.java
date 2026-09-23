@@ -113,7 +113,7 @@ class QuestDetectionTest extends PluginTestBase {
     void runStartsWithThreeQuests() {
         freshRun();
         Session s = sessions().getSession(player.getUniqueId());
-        assertEquals(Session.HAND_SIZE, s.hand.size(), "run should deal a hand of 3 quests");
+        assertEquals(Session.HAND_SIZE, s.hand.size(), "run should deal a full hand of quests");
         for (Quest q : s.hand) {
             assertEquals(1, q.level());
         }
@@ -130,9 +130,9 @@ class QuestDetectionTest extends PluginTestBase {
         freshRun();
         listener = new QuestListener(sessions());
         Session s = sessions().getSession(player.getUniqueId());
-        assertEquals(3, s.hand.size());
+        assertEquals(Session.HAND_SIZE, s.hand.size());
 
-        // Deterministic hand: three BREAK quests with known targets.
+        // Deterministic hand with known targets.
         Quest q1 = new Quest(1, List.of("test-a"),
                 List.of(new QuestObjective(QuestType.BREAK, "OAK_LOG", 3, "Chop 3 oak logs")));
         Quest q2 = new Quest(1, List.of("test-b"),
@@ -143,6 +143,7 @@ class QuestDetectionTest extends PluginTestBase {
         s.hand.add(q1);
         s.hand.add(q2);
         s.hand.add(q3);
+        int sizeBefore = s.hand.size();
 
         // Shrink the deadline so we can prove the reset moves it forward.
         s.questDeadlineMs = System.currentTimeMillis() + 5_000;
@@ -156,7 +157,7 @@ class QuestDetectionTest extends PluginTestBase {
 
         Session after = sessions().getSession(player.getUniqueId());
         assertEquals(1, after.level, "completing any one quest advances the level");
-        assertEquals(3, after.hand.size(), "the hand stays at 3 after a completion");
+        assertEquals(sizeBefore, after.hand.size(), "a replacement is dealt for the completed quest");
         assertFalse(after.hand.contains(q1), "the completed quest leaves the hand");
         assertTrue(after.questDeadlineMs > System.currentTimeMillis() + 240_000,
                 "the quest clock resets to ~5 minutes on any completion");

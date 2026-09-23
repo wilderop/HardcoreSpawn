@@ -35,7 +35,7 @@ class SessionFlowTest extends PluginTestBase {
 
         Session session = sessions().getSession(player.getUniqueId());
         assertNotNull(session);
-        assertEquals(Session.HAND_SIZE, session.hand.size(), "a hand of 3 quests should be dealt");
+        assertEquals(Session.HAND_SIZE, session.hand.size(), "a full hand of quests should be dealt");
         for (Quest q : session.hand) {
             assertEquals(1, q.level());
         }

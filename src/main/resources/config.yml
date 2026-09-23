@@ -6,7 +6,7 @@
 # backed up to config.yml.bak on startup: your settings carry over, but the
 # messages section and the quest bands are refreshed to the new format.
 # Never change this yourself.
-config-version: 6
+config-version: 7
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
@@ -75,18 +75,52 @@ bands:
   - min-level: 1
     max-level: 3
     quests:
-      - { id: chop_logs,   type: BREAK, target: OAK_LOG,     base-amount: 32, description: "Chop {amount} oak logs" }
-      - { id: mine_cobble, type: BREAK, target: COBBLESTONE, base-amount: 48, description: "Mine {amount} cobblestone" }
-      - { id: mine_coal,   type: BREAK, target: COAL_ORE,    base-amount: 16, description: "Mine {amount} coal ore" }
-      - { id: dig_dirt,    type: BREAK, target: DIRT,        base-amount: 64, description: "Dig {amount} dirt" }
-      - { id: craft_planks,type: CRAFT, target: OAK_PLANKS,  base-amount: 64, description: "Craft {amount} oak planks" }
-      - { id: hike_500,    type: TRAVEL, target: BLOCKS,     base-amount: 500, description: "Travel {amount} blocks on foot" }
+      # --- wood: every species, not just oak ---
+      - { id: chop_oak,      type: BREAK, target: OAK_LOG,      base-amount: 24, description: "Chop {amount} oak logs" }
+      - { id: chop_birch,    type: BREAK, target: BIRCH_LOG,    base-amount: 24, description: "Chop {amount} birch logs" }
+      - { id: chop_spruce,   type: BREAK, target: SPRUCE_LOG,   base-amount: 24, description: "Chop {amount} spruce logs" }
+      - { id: chop_jungle,   type: BREAK, target: JUNGLE_LOG,   base-amount: 24, description: "Chop {amount} jungle logs" }
+      - { id: chop_acacia,   type: BREAK, target: ACACIA_LOG,   base-amount: 24, description: "Chop {amount} acacia logs" }
+      - { id: chop_dark_oak, type: BREAK, target: DARK_OAK_LOG, base-amount: 24, description: "Chop {amount} dark oak logs" }
+      - { id: chop_cherry,   type: BREAK, target: CHERRY_LOG,   base-amount: 24, description: "Chop {amount} cherry logs" }
+      - { id: chop_mangrove, type: BREAK, target: MANGROVE_LOG, base-amount: 24, description: "Chop {amount} mangrove logs" }
+      # --- stone: not just cobblestone ---
+      - { id: mine_stone,    type: BREAK, target: STONE,        base-amount: 32, description: "Mine {amount} stone" }
+      - { id: mine_cobble,   type: BREAK, target: COBBLESTONE,  base-amount: 32, description: "Mine {amount} cobblestone" }
+      - { id: mine_andesite, type: BREAK, target: ANDESITE,     base-amount: 32, description: "Mine {amount} andesite" }
+      - { id: mine_granite,  type: BREAK, target: GRANITE,      base-amount: 32, description: "Mine {amount} granite" }
+      - { id: mine_diorite,  type: BREAK, target: DIORITE,      base-amount: 32, description: "Mine {amount} diorite" }
+      - { id: mine_deepslate,type: BREAK, target: DEEPSLATE,     base-amount: 32, description: "Mine {amount} deepslate" }
+      - { id: mine_tuff,     type: BREAK, target: TUFF,         base-amount: 32, description: "Mine {amount} tuff" }
+      # --- ores & dirt ---
+      - { id: mine_coal,     type: BREAK, target: COAL_ORE,     base-amount: 12, description: "Mine {amount} coal ore" }
+      - { id: mine_copper,   type: BREAK, target: COPPER_ORE,   base-amount: 12, description: "Mine {amount} copper ore" }
+      - { id: dig_dirt,      type: BREAK, target: DIRT,         base-amount: 48, description: "Dig {amount} dirt" }
+      - { id: dig_gravel,    type: BREAK, target: GRAVEL,       base-amount: 48, description: "Dig {amount} gravel" }
+      - { id: dig_sand,      type: BREAK, target: SAND,         base-amount: 48, description: "Dig {amount} sand" }
+      # --- easy crafting ---
+      - { id: craft_planks,  type: CRAFT, target: OAK_PLANKS,   base-amount: 48, description: "Craft {amount} oak planks" }
+      - { id: craft_sticks,  type: CRAFT, target: STICK,        base-amount: 32, description: "Craft {amount} sticks" }
+      - { id: craft_torches, type: CRAFT, target: TORCH,        base-amount: 24, description: "Craft {amount} torches" }
+      - { id: craft_table,   type: CRAFT, target: CRAFTING_TABLE, base-amount: 2, description: "Craft {amount} crafting tables" }
+      # --- light combat ---
+      - { id: kill_zombie,   type: KILL,  target: ZOMBIE,       base-amount: 6,  description: "Slay {amount} zombies" }
+      - { id: kill_spider,   type: KILL,  target: SPIDER,       base-amount: 6,  description: "Slay {amount} spiders" }
+      # --- travel (also the guaranteed opening quest) ---
+      - { id: hike_500,      type: TRAVEL, target: BLOCKS,      base-amount: 500, description: "Travel {amount} blocks on foot" }
   - min-level: 4
     max-level: 6
     quests:
-      - { id: smelt_iron,  type: SMELT, target: IRON_INGOT,  base-amount: 10, description: "Smelt {amount} iron ingots" }
-      - { id: mine_iron,   type: BREAK, target: IRON_ORE,    base-amount: 16, description: "Mine {amount} iron ore" }
-      - { id: kill_zombie, type: KILL,  target: ZOMBIE,      base-amount: 8,  description: "Slay {amount} zombies" }
+      - { id: smelt_iron,  type: SMELT, target: IRON_INGOT,  base-amount: 8,  description: "Smelt {amount} iron ingots" }
+      - { id: smelt_copper,type: SMELT, target: COPPER_INGOT,base-amount: 8,  description: "Smelt {amount} copper ingots" }
+      - { id: mine_iron,   type: BREAK, target: IRON_ORE,    base-amount: 12, description: "Mine {amount} iron ore" }
+      - { id: mine_gold,   type: BREAK, target: GOLD_ORE,    base-amount: 10, description: "Mine {amount} gold ore" }
+      - { id: mine_lapis,  type: BREAK, target: LAPIS_ORE,   base-amount: 10, description: "Mine {amount} lapis ore" }
+      - { id: mine_redstone,type: BREAK, target: REDSTONE_ORE,base-amount: 10, description: "Mine {amount} redstone ore" }
+      - { id: kill_zombie, type: KILL,  target: ZOMBIE,      base-amount: 6,  description: "Slay {amount} zombies" }
+      - { id: kill_skeleton_small, type: KILL, target: SKELETON, base-amount: 4, description: "Slay {amount} skeletons" }
+      - { id: get_leather, type: OBTAIN,target: LEATHER,     base-amount: 8,  description: "Hold {amount} leather at once" }
+      - { id: craft_bread, type: CRAFT, target: BREAD,       base-amount: 8,  description: "Bake {amount} bread" }
       - { id: craft_furnace,type: CRAFT,target: FURNACE,     base-amount: 2,  description: "Craft {amount} furnaces" }
       - { id: craft_iron_pick, type: CRAFT, target: IRON_PICKAXE, base-amount: 1, description: "Craft {amount} iron pickaxes" }
   - min-level: 7
@@ -125,9 +159,9 @@ messages:
   confirm-freeze-subtitle: "§eStay still!"
   confirm-freeze-active: "§cYour run is already counting down — stay still!"
   confirm-freeze-cancelled: "§cYou took damage! The run did not start. Type /hardcore to try again."
-  run-started: "§aHardcore run started! Complete §eone §aof these 3 quests before time runs out:\n{quests}\n§7({time} on the clock)"
-  new-quest: "§aNew quest: §e{quest} §7({time} left)\n§7Your 3 quests:\n{quests}"
-  your-quests: "§7Your 3 quests:\n{quests}\n§7({time} left)"
+  run-started: "§aHardcore run started! Complete §eone §aof these 4 quests before time runs out:\n{quests}\n§7({time} on the clock)"
+  new-quest: "§aNew quest: §e{quest} §7({time} left)\n§7Your 4 quests:\n{quests}"
+  your-quests: "§7Your 4 quests:\n{quests}\n§7({time} left)"
   leaderboard-header: "§6§lHardcore Leaderboard §7(top 10 by best level)"
   leaderboard-entry: "§e#{rank} §f{name} §7— best level §e{best}§7, {quests} quests in {runs} runs"
   leaderboard-empty: "§7No hardcore runs recorded yet. Type §e/hardcore §7if you dare."
