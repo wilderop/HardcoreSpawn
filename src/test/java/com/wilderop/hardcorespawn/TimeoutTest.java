@@ -9,7 +9,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Timeout -> escalating damage -> death sequence driven by the TimerTask. */
+/** Timeout -> escalating damage -> averted death, driven by the TimerTask. */
 class TimeoutTest extends PluginTestBase {
 
     @Test
@@ -32,11 +32,14 @@ class TimeoutTest extends PluginTestBase {
         assertTrue(s.timeoutDamagePhase, "timeout should enter the damage phase");
         assertTrue(player.getHealth() < fullHealth, "damage phase should hurt the player");
 
-        // 31s past the deadline: the player is killed.
+        // 31s past the deadline: the run ends without a real death.
         long later = now + 31_000;
         s.nextDamageMs = later + 60_000; // suppress further damage ticks; we test the kill
         task.tick(later);
-        assertTrue(player.isDead(), "player should be dead after the kill window");
+        assertFalse(sessions().hasSession(player.getUniqueId()), "run should end after the kill window");
+        assertFalse(player.isDead(), "the player must never actually die");
+        assertEquals(player.getMaxHealth(), player.getHealth(), 0.001,
+                "the player should be healed to full");
     }
 
     @Test

@@ -83,7 +83,7 @@ public class DiscordNotifier {
         String title;
         int color;
         switch (cause) {
-            case IN_WORLD_DEATH -> {
+            case IN_WORLD_DEATH, AVERTED_DEATH -> {
                 title = "\uD83D\uDC80 " + playerName + " died";
                 color = COLOR_RED;
             }

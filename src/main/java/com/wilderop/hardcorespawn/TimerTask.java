@@ -77,7 +77,8 @@ public final class TimerTask extends BukkitRunnable {
                 }
                 if (!player.isDead()
                         && now - s.questDeadlineMs >= config.getTimeoutKillAfterSeconds() * 1000L) {
-                    player.setHealth(0); // the death listener runs the exit path
+                    // No real death: heal to full and end the run, keeping XP intact.
+                    sessions.avertDeath(player);
                 }
             }
         }

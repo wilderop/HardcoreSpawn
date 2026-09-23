@@ -605,6 +605,59 @@ public final class SessionManager {
     }
 
     /**
+     * Lethal damage was intercepted (or the quest timer expired): the player
+     * never actually dies. Drop run gains where they "died", heal to full,
+     * and end the run immediately with the death message.
+     *
+     * <p>Skipping the death/respawn round-trip keeps the pre-run XP intact:
+     * Bukkit applies the death event's new-XP values at respawn, after
+     * PlayerRespawnEvent, which used to clobber the restored levels.
+     */
+    public void avertDeath(Player player) {
+        UUID id = player.getUniqueId();
+        if (!hasSession(id)) {
+            return;
+        }
+        dropRunGains(player);
+        player.setHealth(player.getMaxHealth());
+        player.setFireTicks(0);
+        endRun(id, ExitCause.AVERTED_DEATH);
+    }
+
+    /**
+     * Forfeit everything gained during the run: drop it where the player is.
+     * Storage + armor + offhand exactly once (getContents() already includes
+     * armor and offhand, so it must not be combined with them).
+     */
+    public void dropRunGains(Player player) {
+        Location loc = player.getLocation();
+        World world = loc.getWorld();
+        dropAll(world, loc, player.getInventory().getStorageContents());
+        dropAll(world, loc, player.getInventory().getArmorContents());
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && !offhand.getType().isAir()) {
+            world.dropItemNaturally(loc, offhand);
+        }
+        // The cursor item is not reliably part of the death event drops, so
+        // forfeit it explicitly. This is dupe-safe: the vanilla drops were
+        // cleared (or never existed on the intercepted path), so exactly one
+        // copy is spawned however the exit was triggered.
+        ItemStack cursor = player.getItemOnCursor();
+        if (cursor != null && !cursor.getType().isAir()) {
+            world.dropItemNaturally(loc, cursor.clone());
+            player.setItemOnCursor(null);
+        }
+    }
+
+    private void dropAll(World world, Location loc, ItemStack[] items) {
+        for (ItemStack item : items) {
+            if (item != null && !item.getType().isAir()) {
+                world.dropItemNaturally(loc, item.clone());
+            }
+        }
+    }
+
+    /**
      * End a run for any reason. Restores the pre-run snapshot, forfeits run
      * gains (dropped at the death site for in-world death, deleted otherwise),
      * returns the player to their pre-run location, and records the level.
@@ -621,12 +674,14 @@ public final class SessionManager {
         String messageKey = switch (cause) {
             case QUIT, ADMIN_RESET -> "quit";
             case DISCONNECT_TIMEOUT -> "disconnect-death";
-            case IN_WORLD_DEATH -> "death";
+            case IN_WORLD_DEATH, AVERTED_DEATH -> "death";
         };
 
         if (player != null && player.isOnline()) {
             if (cause == ExitCause.IN_WORLD_DEATH) {
-                // Drops were handled by the death listener; restore on respawn.
+                // A real death (e.g. another plugin killed without a damage
+                // event, bypassing the interceptor): drops were handled by the
+                // death listener; restore on respawn.
                 pendingRespawnRestores.put(id, new PendingRestore(snapshot, s.returnLocation, messageKey, reached));
                 saveRestores();
             } else {
