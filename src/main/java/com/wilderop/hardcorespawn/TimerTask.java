@@ -52,7 +52,8 @@ public final class TimerTask extends BukkitRunnable {
             s = current;
 
             long remaining = s.questDeadlineMs - now;
-            sessions.getHud().updateHud(player, SessionManager.reachedLevel(s), remaining);
+            sessions.getHud().updateHud(player, SessionManager.reachedLevel(s), remaining,
+                    s.hand, s.questsCompleted);
 
             if (!s.warned60 && remaining <= 60_000 && remaining > 0) {
                 s.warned60 = true;

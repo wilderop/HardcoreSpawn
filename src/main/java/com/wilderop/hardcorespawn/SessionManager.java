@@ -111,6 +111,12 @@ public final class SessionManager {
     public SnapshotManager getSnapshots() { return snapshots; }
     public LeaderboardManager getLeaderboard() { return leaderboard; }
 
+    /** Push the current sidebar config, then (re)show the run HUD. */
+    private void showRunHud(org.bukkit.entity.Player player, Session s, long questMs) {
+        hud.configureSidebar(config.isSidebarEnabled(), config.getSidebarTitle());
+        hud.showRunHud(player, reachedLevel(s), questMs);
+    }
+
     public boolean hasSession(UUID id) { return sessions.containsKey(id); }
     public Session getSession(UUID id) { return sessions.get(id); }
 
@@ -390,7 +396,7 @@ public final class SessionManager {
             excluded.addAll(q.templateIds());
         }
         resetQuestClock(session, now);
-        hud.showRunHud(player, reachedLevel(session), config.getQuestTimeSeconds() * 1000L);
+        showRunHud(player, session, config.getQuestTimeSeconds() * 1000L);
         player.sendMessage(config.format("run-started", Map.of(
                 "quests", formatHand(session),
                 "time", config.formatTime(config.getQuestTimeSeconds() * 1000L))));
@@ -454,7 +460,8 @@ public final class SessionManager {
                 completeQuest(player, s, q);
             }
         } else if (moved) {
-            hud.updateHud(player, reachedLevel(s), s.questDeadlineMs - System.currentTimeMillis());
+            hud.updateHud(player, reachedLevel(s), s.questDeadlineMs - System.currentTimeMillis(),
+                s.hand, s.questsCompleted);
         }
     }
 
@@ -534,7 +541,7 @@ public final class SessionManager {
         long now = System.currentTimeMillis();
         resetQuestClock(s, now);
         long questMs = config.getQuestTimeSeconds() * 1000L;
-        hud.showRunHud(player, reachedLevel(s), questMs);
+        showRunHud(player, s, questMs);
         player.sendMessage(config.format("new-quest", Map.of(
                 "quest", replacement.getDescription(),
                 "quests", formatHand(s),
@@ -780,7 +787,7 @@ public final class SessionManager {
                     s.nextDamageMs = now; // don't punish the restart gap
                 }
                 if (!s.hand.isEmpty()) {
-                    hud.showRunHud(player, reachedLevel(s), s.questDeadlineMs - now);
+                    showRunHud(player, s, s.questDeadlineMs - now);
                     player.sendMessage(config.format("your-quests", Map.of(
                             "quests", formatHand(s),
                             "time", config.formatTime(s.questDeadlineMs - now))));
@@ -796,7 +803,7 @@ public final class SessionManager {
         } else {
             s.offlineSinceMs = 0;
             if (!s.hand.isEmpty()) {
-                hud.showRunHud(player, reachedLevel(s), s.questDeadlineMs - now);
+                showRunHud(player, s, s.questDeadlineMs - now);
                 player.sendMessage(config.format("your-quests", Map.of(
                         "quests", formatHand(s),
                         "time", config.formatTime(s.questDeadlineMs - now))));

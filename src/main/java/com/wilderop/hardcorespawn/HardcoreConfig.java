@@ -34,6 +34,14 @@ public final class HardcoreConfig {
         return cfg.getInt("quest-time-seconds", 300);
     }
 
+    public boolean isSidebarEnabled() {
+        return cfg.getBoolean("hud.sidebar.enabled", true);
+    }
+
+    public String getSidebarTitle() {
+        return cfg.getString("hud.sidebar.title", "§6§lHARDCORE §r§7Lv {level}");
+    }
+
     /**
      * Every N completed quests grants a random mob spawn egg (0 disables).
      */

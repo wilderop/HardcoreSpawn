@@ -6,10 +6,16 @@
 # backed up to config.yml.bak on startup: your settings carry over, but the
 # messages section and the quest bands are refreshed to the new format.
 # Never change this yourself.
-config-version: 5
+config-version: 6
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
+
+# Sidebar scoreboard shown during a run: every active quest with its progress.
+hud:
+  sidebar:
+    enabled: true   # set false if another plugin owns the sidebar
+    title: "§6§lHARDCORE §r§7Lv {level}"
 
 # Every N completed quests grants a random mob spawn egg (0 disables).
 milestone-egg-every: 30
