@@ -72,4 +72,19 @@ public abstract class PluginTestBase {
                 + sessions().getConfig().getStartFreezeSeconds() * 1000L + 5000);
         assert sessions().hasSession(player.getUniqueId()) : "no session after confirm";
     }
+
+    /**
+     * Marks a disconnected mock as rejoined: back in the player list and
+     * reading as online, the way a real PlayerJoinEvent sees the player.
+     */
+    protected void simulateRejoin(PlayerMock player) {
+        try {
+            var online = PlayerMock.class.getDeclaredField("online");
+            online.setAccessible(true);
+            online.setBoolean(player, true);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
+        server.addPlayer(player);
+    }
 }

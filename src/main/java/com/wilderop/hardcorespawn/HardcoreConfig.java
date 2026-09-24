@@ -106,6 +106,14 @@ public final class HardcoreConfig {
     }
 
     /**
+     * Ticks to wait after a rejoin before applying a queued pre-run restore,
+     * so other plugins' join-time data syncs settle first.
+     */
+    public int getRestoreJoinDelayTicks() {
+        return cfg.getInt("restore-join-delay-ticks", 100);
+    }
+
+    /**
      * Discord webhook URL for run notifications. Empty (default) disables.
      */
     public String getDiscordWebhookUrl() {

@@ -68,8 +68,9 @@ class AdminResetOfflineTest extends PluginTestBase {
         assertEquals(0, stats.totalQuests, "admin reset must not record quests");
 
         // Rejoin: the queued restore gives the pre-run state back.
-        server.addPlayer(player);
+        simulateRejoin(player);
         listener().onJoin(new PlayerJoinEvent(player, "join"));
+        server.getScheduler().performTicks(150);
         assertEquals(Material.DIAMOND, player.getInventory().getItem(0).getType());
         assertEquals(4, player.getInventory().getItem(0).getAmount());
         assertEquals(2500, player.getLocation().getX(), 0.001, "restored at pre-run location");

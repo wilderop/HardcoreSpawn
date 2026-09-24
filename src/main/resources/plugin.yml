@@ -1,5 +1,5 @@
 name: HardcoreSpawn
-version: 1.10.2
+version: 1.10.3
 main: com.wilderop.hardcorespawn.HardcoreSpawn
 api-version: '1.21'
 author: wilderop

@@ -33,6 +33,7 @@ class DisconnectTest extends PluginTestBase {
         assertNotEquals(0L, s.offlineSinceMs);
 
         listener().onJoin(new PlayerJoinEvent(player, "join"));
+        server.getScheduler().performTicks(150);
         assertEquals(0L, s.offlineSinceMs, "clock cleared on resume");
         assertEquals(deadline, s.questDeadlineMs, "deadline preserved across a quick rejoin");
         assertTrue(sessions().hasSession(player.getUniqueId()));
@@ -52,6 +53,7 @@ class DisconnectTest extends PluginTestBase {
         s.offlineSinceMs = System.currentTimeMillis() - 61_000;
 
         listener().onJoin(new PlayerJoinEvent(player, "join"));
+        server.getScheduler().performTicks(150);
 
         assertFalse(sessions().hasSession(id), "run must end after a long disconnect");
         assertEquals(beforeX, player.getLocation().getX(), 0.001, "restored at pre-run location");

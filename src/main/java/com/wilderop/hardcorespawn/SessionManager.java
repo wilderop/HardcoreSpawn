@@ -17,9 +17,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -104,6 +106,12 @@ public final class SessionManager {
     private final Map<UUID, StartCountdown> pendingStarts = new HashMap<>();
     private final Map<UUID, PendingRestore> pendingRespawnRestores = new HashMap<>();
     private final Map<UUID, PendingRestore> pendingOfflineRestores = new HashMap<>();
+    /**
+     * Players with a deferred post-join restore already scheduled. Prevents
+     * double-scheduling when a player rejoins while a deferred task is still
+     * pending; entries are removed when the task fires.
+     */
+    private final Set<UUID> deferredRestorePlayers = new HashSet<>();
 
     public SessionManager(HardcoreSpawn plugin, HardcoreConfig config, SnapshotManager snapshots,
                           QuestGenerator quests, LeaderboardManager leaderboard, HudService hud) {
@@ -151,12 +159,18 @@ public final class SessionManager {
         pendingStarts.clear();
         pendingRespawnRestores.clear();
         pendingOfflineRestores.clear();
+        deferredRestorePlayers.clear();
         entityDamage.clear();
         entityDamageSeenMs.clear();
     }
 
     /** Copy of active sessions for safe iteration. */
     public List<Session> sessionsSnapshot() { return new ArrayList<>(sessions.values()); }
+
+    /** True while a pre-run restore is queued for the player's next join. */
+    public boolean hasPendingOfflineRestore(UUID id) {
+        return pendingOfflineRestores.containsKey(id);
+    }
 
     public PendingRestore consumeRespawnRestore(UUID id) { return pendingRespawnRestores.remove(id); }
 
@@ -1026,16 +1040,18 @@ public final class SessionManager {
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
 
-        PendingRestore restore = pendingOfflineRestores.remove(id);
+        PendingRestore restore = pendingOfflineRestores.get(id);
         if (restore != null) {
-            if (player.isDead()) {
-                // Died and the server restarted before respawning: the player
-                // will still be dead on rejoin, so apply the restore at the
-                // respawn event instead of on the corpse right now.
-                pendingRespawnRestores.put(id, restore);
-            } else {
-                applyRestore(player, restore);
-            }
+            // The pre-run restore is applied on a short delay AFTER the join
+            // completes, not synchronously in the join event: data plugins
+            // that sync player state on join (inventories, etc.) apply their
+            // own stored state during/after PlayerJoinEvent, and an immediate
+            // restore would be silently overwritten by theirs — the player
+            // would log in to the run-era inventory with no error logged.
+            // The entry stays queued until the deferred task actually
+            // succeeds, so a disconnect during the wait simply retries on
+            // the next join.
+            scheduleDeferredRestore(player);
             saveRestores();
             return;
         }
@@ -1051,7 +1067,7 @@ public final class SessionManager {
             // clock counted the downtime. Resume (or time out on the frozen
             // offline time) now that the player is back.
             if (s.pausedOfflineElapsedMs > graceMs) {
-                endRun(id, ExitCause.DISCONNECT_TIMEOUT);
+                endRunOnJoinTimeout(id, s);
             } else {
                 s.questDeadlineMs = now + Math.max(0, s.pausedQuestRemainingMs);
                 s.pausedQuestRemainingMs = 0;
@@ -1072,8 +1088,7 @@ public final class SessionManager {
             return;
         }
         if (s.offlineSinceMs != 0 && now - s.offlineSinceMs > graceMs) {
-            s.offlineSinceMs = 0; // online again so endRun takes the online path
-            endRun(id, ExitCause.DISCONNECT_TIMEOUT);
+            endRunOnJoinTimeout(id, s);
         } else {
             s.offlineSinceMs = 0;
             if (!s.hand.isEmpty()) {
@@ -1085,6 +1100,95 @@ public final class SessionManager {
             player.sendMessage(config.format("welcome-back", Map.of()));
             saveSessions();
         }
+    }
+
+    /**
+     * The run timed out while the player was offline, but the offline sweeper
+     * had not ended it yet when they rejoined. Tears the run down exactly
+     * like {@link #endRun(UUID, ExitCause)}, except the pre-run restore is
+     * queued and deferred past other plugins' join processing (see
+     * {@link #scheduleDeferredRestore(Player)}) instead of being applied
+     * synchronously inside the join event, where a data plugin's join sync
+     * could overwrite it.
+     */
+    private void endRunOnJoinTimeout(UUID id, Session s) {
+        sessions.remove(id);
+        pendingConfirms.remove(id);
+        int reached = reachedLevel(s);
+        Snapshot snapshot = snapshots.peek(id);
+        if (snapshot != null) {
+            pendingOfflineRestores.put(id,
+                    new PendingRestore(snapshot, s.returnLocation, "disconnect-death", reached));
+            saveRestores();
+        } else {
+            plugin.getLogger().severe("No snapshot for " + id
+                    + "; run ended without restore data (inventory left untouched).");
+        }
+        Player player = Bukkit.getPlayer(id);
+        if (player != null && player.isOnline()) {
+            scheduleDeferredRestore(player);
+        }
+        hud.hideHud(id);
+        leaderboard.runFinished(id, reached, s.questsCompleted);
+        String playerName = player != null ? player.getName() : id.toString();
+        discord.sendRunEnded(playerName, ExitCause.DISCONNECT_TIMEOUT, reached, s.questsCompleted,
+                System.currentTimeMillis() - s.runStartedMs);
+        saveSessions();
+    }
+
+    /**
+     * Schedules the queued pre-run restore to apply after the join settles
+     * (see {@code restore-join-delay-ticks}). The entry stays in
+     * {@link #pendingOfflineRestores} until the deferred task succeeds, so a
+     * disconnect during the wait simply re-schedules on the next join.
+     * Package-private for tests.
+     */
+    void scheduleDeferredRestore(Player player) {
+        UUID id = player.getUniqueId();
+        if (!pendingOfflineRestores.containsKey(id) || !deferredRestorePlayers.add(id)) {
+            return;
+        }
+        long delay = Math.max(1, config.getRestoreJoinDelayTicks());
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            deferredRestorePlayers.remove(id);
+            applyDeferredRestore(id);
+        }, delay);
+    }
+
+    /**
+     * Applies the queued pre-run restore once join processing (including
+     * other plugins' data syncs) has settled. Consumes the queue entry only
+     * on success.
+     */
+    private void applyDeferredRestore(UUID id) {
+        PendingRestore restore = pendingOfflineRestores.get(id);
+        if (restore == null) {
+            return; // consumed elsewhere (e.g. /hardcoreadmin restore)
+        }
+        Player player = Bukkit.getPlayer(id);
+        if (player == null || !player.isOnline()) {
+            return; // stays queued; the next join re-schedules
+        }
+        if (player.isDead()) {
+            // Died (and the server restarted) before respawning: apply at
+            // the respawn event instead of on the corpse.
+            pendingOfflineRestores.remove(id);
+            pendingRespawnRestores.put(id, restore);
+            saveRestores();
+            return;
+        }
+        if (sessions.containsKey(id)) {
+            // A new run started during the delay: the queued snapshot belongs
+            // to the old run and must never be applied over a live one.
+            plugin.getLogger().warning("Skipping deferred pre-run restore for " + player.getName()
+                    + ": a new hardcore run is already active.");
+            pendingOfflineRestores.remove(id);
+            saveRestores();
+            return;
+        }
+        applyRestore(player, restore);
+        pendingOfflineRestores.remove(id);
+        saveRestores();
     }
 
     private void applyRestore(Player player, PendingRestore restore) {

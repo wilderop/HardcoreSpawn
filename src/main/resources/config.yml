@@ -6,7 +6,7 @@
 # backed up to config.yml.bak on startup: your settings carry over, but the
 # messages section and the quest bands are refreshed to the new format.
 # Never change this yourself.
-config-version: 11
+config-version: 12
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
@@ -51,6 +51,11 @@ multi-objective-min-level: 13
 # Disconnect handling: the quest clock keeps ticking while offline.
 # Rejoin within the grace period to resume; after it, the run is dead.
 disconnect-grace-seconds: 60
+
+# Restoring a pre-run snapshot after an offline run-end waits this long
+# after the player rejoins, so other plugins that sync player data on join
+# (inventories, etc.) finish first and can't overwrite the restore.
+restore-join-delay-ticks: 100
 
 # Discord webhook URL for run notifications (run started, quest completed,
 # run ended). Empty disables. Paste your webhook URL here to enable.

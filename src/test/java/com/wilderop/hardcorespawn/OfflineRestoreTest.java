@@ -73,6 +73,7 @@ class OfflineRestoreTest extends PluginTestBase {
 
         // The entry must be retained (world resolved lazily), not dropped.
         listener().onJoin(new PlayerJoinEvent(player, "join"));
+        server.getScheduler().performTicks(150);
         assertNotNull(player.getInventory().getItem(0), "inventory must be restored");
         assertEquals(Material.DIAMOND, player.getInventory().getItem(0).getType());
         assertEquals(4, player.getInventory().getItem(0).getAmount());
@@ -104,7 +105,9 @@ class OfflineRestoreTest extends PluginTestBase {
         sessions().recoverOrphanedSnapshots();
 
         // Rejoin: the pre-run state must come back.
+        simulateRejoin(player);
         listener().onJoin(new PlayerJoinEvent(player, "join"));
+        server.getScheduler().performTicks(150);
         assertNotNull(player.getInventory().getItem(0), "inventory must be restored after rejoin");
         assertEquals(Material.DIAMOND, player.getInventory().getItem(0).getType());
         assertEquals(4, player.getInventory().getItem(0).getAmount());
@@ -127,6 +130,7 @@ class OfflineRestoreTest extends PluginTestBase {
         sessions().recoverOrphanedSnapshots();
 
         listener().onJoin(new PlayerJoinEvent(player, "join"));
+        server.getScheduler().performTicks(150);
         assertNotNull(player.getInventory().getItem(0), "orphaned snapshot must be restored");
         assertEquals(Material.DIAMOND, player.getInventory().getItem(0).getType());
         assertEquals(beforeX, player.getLocation().getX(), 0.001, "pre-run location must be restored");
@@ -200,7 +204,9 @@ class OfflineRestoreTest extends PluginTestBase {
         assertNotNull(msg, "expected a reply to /hardcoreadmin restore");
         assertTrue(msg.contains("Restored pre-run snapshot for " + name), "unexpected reply: " + msg);
 
+        simulateRejoin(player);
         listener().onJoin(new PlayerJoinEvent(player, "join"));
+        server.getScheduler().performTicks(150);
         assertEquals(Material.DIAMOND, player.getInventory().getItem(0).getType());
         assertEquals(beforeX, player.getLocation().getX(), 0.001);
     }

@@ -88,6 +88,10 @@ class SnapshotEdgeCaseTest extends PluginTestBase {
         assertNull(player.getInventory().getItem(0),
                 "restore must be deferred while the player is dead");
 
+        // ...the deferred task notices the player is still dead and routes
+        // the restore to the respawn queue...
+        server.getScheduler().performTicks(150);
+
         // ...but it must still apply when they finally respawn.
         PlayerRespawnEvent respawnEvent =
                 new PlayerRespawnEvent(player, new Location(world, 0, 70, 0), false);
