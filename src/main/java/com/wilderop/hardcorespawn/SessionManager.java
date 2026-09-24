@@ -410,6 +410,22 @@ public final class SessionManager {
         session.timeoutDamagePhase = false;
     }
 
+    /**
+     * Add bonus time to the shared quest deadline. If the clock was already in
+     * the timeout damage phase, the bonus pulls the deadline back into the
+     * future and the damage stops; warnings re-arm based on the new remaining
+     * time.
+     */
+    private void extendQuestClock(Session session, long now, long bonusMs) {
+        session.questDeadlineMs += bonusMs;
+        long remaining = session.questDeadlineMs - now;
+        if (remaining > 0) {
+            session.timeoutDamagePhase = false;
+            session.warned60 = remaining <= 60_000;
+            session.warned30 = remaining <= 30_000;
+        }
+    }
+
     /** Numbered list of the active hand with progress, for chat messages. */
     private static String formatHand(Session s) {
         StringBuilder sb = new StringBuilder();
@@ -510,9 +526,9 @@ public final class SessionManager {
     }
 
     /**
-     * One quest from the hand was completed: level up, reset the shared
-     * quest clock, and deal a replacement so the hand stays full. The new
-     * quest excludes the templates of the other two active quests (and of
+     * One quest from the hand was completed: level up, add bonus time to the
+     * shared quest clock, and deal a replacement so the hand stays full. The
+     * new quest excludes the templates of the other active quests (and of
      * the one just completed) so it never duplicates an option in the hand.
      */
     public void completeQuest(Player player, Session s, Quest completed) {
@@ -521,7 +537,9 @@ public final class SessionManager {
         }
         s.level++;
         s.questsCompleted++;
-        player.sendMessage(config.format("quest-complete", Map.of()));
+        long bonusMs = config.getQuestCompleteBonusSeconds() * 1000L;
+        player.sendMessage(config.format("quest-complete",
+                Map.of("bonus", config.formatTime(bonusMs))));
         int every = config.getMilestoneEggEvery();
         if (every > 0 && s.questsCompleted % every == 0) {
             grantMilestoneEgg(player, s.questsCompleted);
@@ -539,13 +557,13 @@ public final class SessionManager {
         discord.sendQuestCompleted(player.getName(), completed.getDescription(),
                 replacement.getDescription(), s.questsCompleted, reachedLevel(s));
         long now = System.currentTimeMillis();
-        resetQuestClock(s, now);
-        long questMs = config.getQuestTimeSeconds() * 1000L;
-        showRunHud(player, s, questMs);
+        extendQuestClock(s, now, bonusMs);
+        long remainingMs = Math.max(0L, s.questDeadlineMs - now);
+        showRunHud(player, s, remainingMs);
         player.sendMessage(config.format("new-quest", Map.of(
                 "quest", replacement.getDescription(),
                 "quests", formatHand(s),
-                "time", config.formatTime(questMs),
+                "time", config.formatTime(remainingMs),
                 "level", String.valueOf(replacement.level()))));
         saveSessions();
     }

@@ -43,6 +43,39 @@ class TimeoutTest extends PluginTestBase {
     }
 
     @Test
+    void completingQuestDuringDamagePhaseExtendsClockAndStopsDamage() {
+        PlayerMock player = newPlayer();
+        startRun(player);
+        Session s = sessions().getSession(player.getUniqueId());
+        Quest q = new Quest(1, List.of("t"), List.of(
+                new QuestObjective(QuestType.BREAK, "OAK_LOG", 1, "chop")));
+        s.hand.clear();
+        s.hand.add(q);
+
+        long now = System.currentTimeMillis();
+        TimerTask task = new TimerTask(sessions());
+
+        // Enter the damage phase.
+        s.questDeadlineMs = now - 1_000;
+        task.tick(now);
+        assertTrue(s.timeoutDamagePhase, "precondition: damage phase active");
+
+        // Completing a quest adds the bonus and pulls the clock back to safety.
+        sessions().completeQuest(player, s, q);
+        Session after = sessions().getSession(player.getUniqueId());
+        assertFalse(after.timeoutDamagePhase,
+                "damage phase should stop once the clock is extended");
+        assertTrue(after.questDeadlineMs > System.currentTimeMillis() + 240_000,
+                "deadline should be ~5 minutes out after the bonus");
+
+        // The clock keeps ticking with no further damage.
+        double health = player.getHealth();
+        task.tick(System.currentTimeMillis());
+        assertEquals(health, player.getHealth(), 0.001,
+                "no damage once the clock is back in the future");
+    }
+
+    @Test
     void warningsFireOnce() {
         PlayerMock player = newPlayer();
         startRun(player);

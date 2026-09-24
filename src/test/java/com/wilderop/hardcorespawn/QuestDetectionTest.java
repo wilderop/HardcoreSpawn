@@ -145,8 +145,9 @@ class QuestDetectionTest extends PluginTestBase {
         s.hand.add(q3);
         int sizeBefore = s.hand.size();
 
-        // Shrink the deadline so we can prove the reset moves it forward.
+        // Shrink the deadline so we can prove the completion bonus moves it forward.
         s.questDeadlineMs = System.currentTimeMillis() + 5_000;
+        long deadlineBefore = s.questDeadlineMs;
 
         // Partial progress on the second quest.
         listener.progressBreak(player, "STONE", 2);
@@ -159,8 +160,8 @@ class QuestDetectionTest extends PluginTestBase {
         assertEquals(1, after.level, "completing any one quest advances the level");
         assertEquals(sizeBefore, after.hand.size(), "a replacement is dealt for the completed quest");
         assertFalse(after.hand.contains(q1), "the completed quest leaves the hand");
-        assertTrue(after.questDeadlineMs > System.currentTimeMillis() + 240_000,
-                "the quest clock resets to ~5 minutes on any completion");
+        assertTrue(after.questDeadlineMs - deadlineBefore >= 295_000,
+                "completing a quest adds ~5 minutes to the clock");
 
         // The untouched quest kept its partial progress.
         assertTrue(after.hand.contains(q2), "uncompleted quests stay in the hand");

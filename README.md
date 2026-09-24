@@ -1,6 +1,3 @@
-<!-- azpbmd-live -->
-**Live:** survival
-<!-- /azpbmd-live -->
 # HardcoreSpawn
 
 A Paper plugin that turns your world's spawn into a hardcore quest gauntlet.
@@ -31,7 +28,7 @@ everything you gained is gone.
   rule can never be satisfied, so only fully-empty players may start there.
   This keeps players from farming a run next to their base.
 - **Quests**: you are dealt a hand of **3 quests at a time** — complete
-  **any one** of them to reset the 5-minute timer. Each completion deals a
+  **any one** of them to add 5 minutes to the timer. Each completion deals a
   fresh quest into the hand (never duplicating the other two), so you always
   have options. Quests are endless and generated per level (~1.3× scaling
   per level, never the same template twice in a row):

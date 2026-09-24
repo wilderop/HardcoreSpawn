@@ -8,7 +8,7 @@ import java.util.UUID;
 
 /** Mutable state of one active hardcore run. */
 public final class Session {
-    /** How many quests are offered at once. Complete any one to reset the timer. */
+    /** How many quests are offered at once. Complete any one to add time to the clock. */
     public static final int HAND_SIZE = 4;
 
     public final UUID playerId;
@@ -19,8 +19,8 @@ public final class Session {
     /** Epoch millis when the run actually started (after the start freeze). */
     public long runStartedMs;
     /** The active quest hand: up to HAND_SIZE quests. Completing any one
-     *  resets the quest clock and replaces the completed quest with a new one,
-     *  so the player always has options. */
+     *  adds bonus time to the quest clock and replaces the completed quest
+     *  with a new one, so the player always has options. */
     public final List<Quest> hand = new ArrayList<>();
     public long questDeadlineMs;      // epoch millis; 0 = paused across a restart
     public long offlineSinceMs;       // 0 = online

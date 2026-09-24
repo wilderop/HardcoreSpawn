@@ -34,6 +34,11 @@ public final class HardcoreConfig {
         return cfg.getInt("quest-time-seconds", 300);
     }
 
+    /** Bonus added to the quest clock each time any quest is completed. */
+    public int getQuestCompleteBonusSeconds() {
+        return cfg.getInt("quest-complete-bonus-seconds", 300);
+    }
+
     public boolean isSidebarEnabled() {
         return cfg.getBoolean("hud.sidebar.enabled", true);
     }
