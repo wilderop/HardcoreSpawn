@@ -771,17 +771,24 @@ public final class SessionManager {
         }
         Quest replacement = quests.generate(s.level + 1, excluded);
         s.hand.add(replacement);
-        // New personal best level (same level the leaderboard records) wins
-        // the high-score prize: a spawner block plus a spawn egg.
+        // The high-score prize pays out at most ONCE per run: the first level
+        // that sets a new server record wins a spawner block plus a spawn
+        // egg. Personal bests below the server record win nothing.
         int reached = reachedLevel(s);
         if (config.isHighScorePrizeEnabled()) {
             LeaderboardManager.Stats stats = leaderboard.stats(player.getUniqueId());
-            if (reached > stats.bestLevel) {
-                // Record the new best immediately so each further level in
-                // this record run awards again.
+            int serverRecord = leaderboard.serverRecord();
+            boolean newBest = reached > stats.bestLevel;
+            if (newBest) {
+                // Record the new best immediately so the leaderboard stays live.
                 stats.bestLevel = reached;
+            }
+            if (!s.prizeAwarded && reached > serverRecord) {
+                s.prizeAwarded = true;
                 leaderboard.save();
                 grantHighScorePrize(player, reached);
+            } else if (newBest) {
+                leaderboard.save();
             }
         }
         discord.sendQuestCompleted(player.getName(), completed.getDescription(),
@@ -799,8 +806,9 @@ public final class SessionManager {
     }
 
     /**
-     * High-score prize: a new personal best level awards BOTH an empty mob
-     * spawner block and a random mob spawn egg. Right-clicking the spawner
+     * High-score prize: the first level of a run that sets a new server
+     * record awards BOTH an empty mob spawner block and a random mob spawn
+     * egg, at most once per run. Right-clicking the spawner
      * with an egg sets what it spawns. Like all run loot they must be banked
      * in a world chest or they are lost on death; a full inventory drops
      * them at the player's feet.
@@ -1341,6 +1349,7 @@ public final class SessionManager {
             yaml.set(key + ".warned30", s.warned30);
             yaml.set(key + ".timeoutDamagePhase", s.timeoutDamagePhase);
             yaml.set(key + ".nextDamageMs", s.nextDamageMs);
+            yaml.set(key + ".prizeAwarded", s.prizeAwarded);
             Location r = s.returnLocation;
             yaml.set(key + ".return.world", r.getWorld().getName());
             yaml.set(key + ".return.x", r.getX());
@@ -1424,6 +1433,7 @@ public final class SessionManager {
                 s.warned30 = yaml.getBoolean(key + ".warned30");
                 s.timeoutDamagePhase = yaml.getBoolean(key + ".timeoutDamagePhase");
                 s.nextDamageMs = yaml.getLong(key + ".nextDamageMs");
+                s.prizeAwarded = yaml.getBoolean(key + ".prizeAwarded");
                 if (yaml.contains(key + ".quests")) {
                     for (Map<?, ?> qm : (List<Map<?, ?>>) (List<?>) yaml.getMapList(key + ".quests")) {
                         s.hand.add(readQuest(qm));

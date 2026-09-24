@@ -48,7 +48,7 @@ public final class HardcoreConfig {
     }
 
     /**
-     * A new personal best level immediately awards a mob spawner block AND a
+     * A new server record level immediately awards a mob spawner block AND a
      * random mob spawn egg (false disables).
      */
     public boolean isHighScorePrizeEnabled() {

@@ -53,9 +53,13 @@ public final class LeaderboardManager {
         }
     }
 
+    /** The server record: the highest bestLevel any player has reached. */
+    public int serverRecord() {
+        return stats.values().stream().mapToInt(s -> s.bestLevel).max().orElse(0);
+    }
+
     /** Top players by best level (ties broken by total quests), up to limit. */
-    public List<Map.Entry<UUID, Stats>> topByBestLevel(int limit) {
-        return stats.entrySet().stream()
+    public List<Map.Entry<UUID, Stats>> topByBestLevel(int limit) {        return stats.entrySet().stream()
                 .sorted((a, b) -> {
                     int cmp = Integer.compare(b.getValue().bestLevel, a.getValue().bestLevel);
                     if (cmp != 0) {

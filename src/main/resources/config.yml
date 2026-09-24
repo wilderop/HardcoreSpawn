@@ -6,7 +6,7 @@
 # backed up to config.yml.bak on startup: your settings carry over, but the
 # messages section and the quest bands are refreshed to the new format.
 # Never change this yourself.
-config-version: 12
+config-version: 13
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
@@ -18,9 +18,10 @@ hud:
     enabled: true   # set false if another plugin owns the sidebar
     title: "§6§lHARDCORE §r§7Lv {level}"
 
-# A new personal best level immediately awards BOTH a mob spawner block and a
-# random mob spawn egg (right-click the spawner with an egg to choose what it
-# spawns). Set false to disable.
+# The first level of a run that sets a new server record immediately awards
+# BOTH a mob spawner block and a random mob spawn egg (right-click the
+# spawner with an egg to choose what it spawns), at most once per run.
+# Set false to disable.
 highscore-prize:
   enabled: true
 
@@ -177,7 +178,7 @@ messages:
   start-denied-too-close: "§cTravel at least {radius} blocks from ({center-x}, {center-z}), or empty your inventory and ender chest first."
   already-running: "§cYou are already in a hardcore run!"
   teleport-failed: "§cCould not scatter you into the wilds. Run cancelled — your inventory was restored."
-  highscore-prize-announce: "§6★ Set a new personal high score and win a §bMob Spawner §6+ §dSpawn Egg§6!"
+  highscore-prize-announce: "§6★ Set a new server high score and win a §bMob Spawner §6+ §dSpawn Egg§6!"
   confirm-freeze-start: "§eStand still for {seconds} seconds! Take no damage and your run will begin."
   confirm-freeze-title: "§c§l{seconds}"
   confirm-freeze-subtitle: "§eStay still!"
@@ -190,8 +191,8 @@ messages:
   leaderboard-entry: "§e#{rank} §f{name} §7— best level §e{best}§7, {quests} quests in {runs} runs"
   leaderboard-empty: "§7No hardcore runs recorded yet. Type §e/hardcore §7if you dare."
   quest-complete: "§aQuest complete! §e{bonus} §aadded to the clock — pick your next quest!"
-  highscore-prize: "§6★ New high score! §eLevel {level}§6 — you earned a §bMob Spawner §6and a §d{mob} Spawn Egg§6!"
-  highscore-prize-dropped: "§6★ New high score! §eLevel {level}§6 — your §bMob Spawner §6and §dSpawn Egg §6dropped at your feet (inventory full)!"
+  highscore-prize: "§6★ New server high score! §eLevel {level}§6 — you earned a §bMob Spawner §6and a §d{mob} Spawn Egg§6!"
+  highscore-prize-dropped: "§6★ New server high score! §eLevel {level}§6 — your §bMob Spawner §6and §dSpawn Egg §6dropped at your feet (inventory full)!"
   solitude-notice: "§c§lThe wilds watch! §cAnother runner is near — quest progress is §lFROZEN§c. Your timer keeps burning — get away from other runners!"
   solitude-clear: "§aThe wilds look away. Quest progress resumes."
   solitude-actionbar: "§c§l⚠ §cQuest progress FROZEN — another runner is nearby! Move away!"

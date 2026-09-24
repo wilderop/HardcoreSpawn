@@ -30,6 +30,9 @@ public final class Session {
     /** The wilds freeze quest progress while another runner is within the
      * solitude radius. Recomputed every second; not persisted. */
     public boolean crowded;
+    /** True once this run has paid out its single high-score prize.
+     * Persisted so a restart mid-run cannot award it twice. */
+    public boolean prizeAwarded;
     public long nextDamageMs;
     // Frozen at shutdown so restart downtime counts against neither the quest
     // clock nor the disconnect grace period. questDeadlineMs == 0 while paused.
