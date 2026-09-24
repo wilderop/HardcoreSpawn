@@ -6,7 +6,7 @@
 # backed up to config.yml.bak on startup: your settings carry over, but the
 # messages section and the quest bands are refreshed to the new format.
 # Never change this yourself.
-config-version: 9
+config-version: 10
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
@@ -187,8 +187,10 @@ messages:
   quest-complete: "§aQuest complete! §e{bonus} §aadded to the clock — pick your next quest!"
   highscore-prize: "§6★ New high score! §eLevel {level}§6 — you earned a §bMob Spawner §6and a §d{mob} Spawn Egg§6!"
   highscore-prize-dropped: "§6★ New high score! §eLevel {level}§6 — your §bMob Spawner §6and §dSpawn Egg §6dropped at your feet (inventory full)!"
-  solitude-notice: "§cThe wilds watch — another runner is near. Quest progress is frozen; find solitude!"
+  solitude-notice: "§c§lThe wilds watch! §cAnother runner is near — quest progress is §lFROZEN§c. Your timer keeps burning — get away from other runners!"
   solitude-clear: "§aThe wilds look away. Quest progress resumes."
+  solitude-actionbar: "§c§l⚠ §cQuest progress FROZEN — another runner is nearby! Move away!"
+  solo-kill-denied: "§cThat {mob} kill didn't count — §eyou§c didn't deal most of the damage!"
   quit: "§cYou forfeited your run at level {level}. Your original inventory was restored; everything you gained is gone."
   death: "§cYour hardcore run ended at level {level}. Your original inventory was restored; everything you gained is gone."
   disconnect-death: "§cYou were gone too long. Your hardcore run ended at level {level}."

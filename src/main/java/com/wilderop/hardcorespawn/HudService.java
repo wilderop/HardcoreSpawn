@@ -13,6 +13,12 @@ public interface HudService {
     void warnActionBar(Player player, String message);
 
     /**
+     * Marks a runner as crowded (another runner nearby, progress frozen) or
+     * not. Implementations without a sidebar ignore it.
+     */
+    default void setCrowded(UUID playerId, boolean crowded) {}
+
+    /**
      * Optional sidebar configuration; implementations without a sidebar
      * (headless/test HUDs) ignore it.
      */

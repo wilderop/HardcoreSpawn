@@ -43,6 +43,21 @@ class SoloKillTest extends PluginTestBase {
         sessions().recordPlayerDamage(mob, p.getUniqueId(), amount, System.currentTimeMillis());
     }
 
+    /** Drains queued chat messages, tolerating both null and throw-on-empty. */
+    private static void drainMessages(PlayerMock p) {
+        for (int i = 0; i < 100; i++) {
+            String m;
+            try {
+                m = p.nextMessage();
+            } catch (RuntimeException e) {
+                break;
+            }
+            if (m == null) {
+                break;
+            }
+        }
+    }
+
     @Test
     void untrackedKillCountsAsSolo() {
         freshRuns();
@@ -103,6 +118,25 @@ class SoloKillTest extends PluginTestBase {
         listener.handleKill(alice, "ZOMBIE", mob);
 
         assertEquals(1, obj.progress(), "a genuine solo kill must count");
+    }
+
+    @Test
+    void deniedKillTellsThePlayerWhy() {
+        freshRuns();
+        forceKillQuest(alice);
+        drainMessages(alice);
+        UUID mob = UUID.randomUUID();
+        damage(mob, bob, 18.0);  // helper does the work
+        damage(mob, alice, 2.0); // alice taps last
+
+        listener.handleKill(alice, "ZOMBIE", mob);
+
+        String denial = alice.nextMessage();
+        assertNotNull(denial, "a denied kill must tell the player why");
+        assertTrue(denial.contains("didn't count"),
+                "denial must say the kill didn't count: " + denial);
+        assertTrue(denial.contains("Zombie"),
+                "denial must name the mob: " + denial);
     }
 
     @Test

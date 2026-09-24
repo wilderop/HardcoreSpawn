@@ -93,8 +93,17 @@ public final class QuestListener implements Listener {
     void handleKill(Player killer, String entityType, UUID entityId) {
         if (sessions.isSoloKill(entityId, killer.getUniqueId())) {
             progressKill(killer, entityType, 1);
+        } else {
+            // Say so loudly: a silent no-credit kill feels like a bug.
+            killer.sendMessage(sessions.getConfig().format("solo-kill-denied",
+                    Map.of("mob", prettyMobName(entityType))));
         }
         sessions.forgetEntityDamage(entityId);
+    }
+
+    private static String prettyMobName(String entityType) {
+        String lower = entityType.toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
     }
 
     /**

@@ -79,6 +79,27 @@ class SidebarHudTest extends PluginTestBase {
     }
 
     @Test
+    void crowdedSidebarShowsFrozenWarning() {
+        PlayerMock player = server.addPlayer("SidebarCrowded");
+        BukkitHudService hud = new BukkitHudService();
+        List<Quest> hand = List.of(quest("Break 64 oak logs", "12/64"));
+        String warning = "§c§l⚠ PROGRESS FROZEN — RUNNER NEARBY";
+
+        hud.showRunHud(player, 1, 300_000L);
+        hud.setCrowded(player.getUniqueId(), true);
+        hud.updateHud(player, 1, 299_000L, hand, 0);
+
+        assertTrue(sidebarObjective(player).getScore(warning).isScoreSet(),
+                "crowded sidebar must show the frozen warning");
+
+        hud.setCrowded(player.getUniqueId(), false);
+        hud.updateHud(player, 1, 298_000L, hand, 0);
+
+        assertEquals(0, sidebarObjective(player).getScore(warning).getScore(),
+                "warning must clear when no longer crowded");
+    }
+
+    @Test
     void hideHudRestoresMainScoreboard() {
         PlayerMock player = server.addPlayer("SidebarHide");
         BukkitHudService hud = new BukkitHudService();

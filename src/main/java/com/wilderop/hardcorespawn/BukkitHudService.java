@@ -29,6 +29,8 @@ public final class BukkitHudService implements HudService {
     private final Map<UUID, String> sidebarCache = new HashMap<>();
     /** Last rendered sidebar lines per player, so stale entries reset exactly. */
     private final Map<UUID, List<String>> sidebarLines = new HashMap<>();
+    /** Runners currently crowded: their sidebar shows a frozen-progress warning. */
+    private final java.util.Set<UUID> crowdedPlayers = new java.util.HashSet<>();
 
     private boolean sidebarEnabled = true;
     private String sidebarTitle = "§6§lHARDCORE §r§7Lv {level}";
@@ -106,6 +108,15 @@ public final class BukkitHudService implements HudService {
     }
 
     @Override
+    public void setCrowded(UUID playerId, boolean crowded) {
+        if (crowded) {
+            crowdedPlayers.add(playerId);
+        } else {
+            crowdedPlayers.remove(playerId);
+        }
+    }
+
+    @Override
     public void warnActionBar(Player player, String message) {
         // Config messages use legacy section codes; deserialize them so the
         // player sees colors instead of literal '§' characters.
@@ -127,6 +138,9 @@ public final class BukkitHudService implements HudService {
         }
         String title = sidebarTitle(level);
         List<String> lines = renderSidebarLines(hand, questsCompleted);
+        if (crowdedPlayers.contains(player.getUniqueId())) {
+            lines.add(0, "§c§l⚠ PROGRESS FROZEN — RUNNER NEARBY");
+        }
         String signature = title + "\n" + String.join("\n", lines);
         if (signature.equals(sidebarCache.get(player.getUniqueId()))) {
             return; // nothing changed; rebuilding every tick would flicker
@@ -147,6 +161,7 @@ public final class BukkitHudService implements HudService {
         if (sidebars.remove(playerId) != null) {
             sidebarCache.remove(playerId);
             sidebarLines.remove(playerId);
+            crowdedPlayers.remove(playerId);
             Player p = Bukkit.getPlayer(playerId);
             if (p != null) {
                 p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());

@@ -629,6 +629,12 @@ public final class SessionManager {
                 s.crowded = crowded;
                 p.sendMessage(config.format(crowded ? "solitude-notice" : "solitude-clear", Map.of()));
             }
+            hud.setCrowded(s.playerId, crowded);
+            if (crowded) {
+                // Persistent and unmissable: an action bar every second while
+                // progress is frozen, so nobody mistakes it for a bug.
+                hud.warnActionBar(p, config.message("solitude-actionbar"));
+            }
         }
     }
 

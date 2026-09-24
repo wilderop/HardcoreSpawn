@@ -11,6 +11,7 @@ public final class NoOpHudService implements HudService {
     public int updates;
     public int lastHandSize = -1;
     public int lastQuestsCompleted = -1;
+    public String lastWarning;
 
     @Override
     public void showRunHud(Player player, int level, long questTimeMs) {}
@@ -32,5 +33,6 @@ public final class NoOpHudService implements HudService {
     @Override
     public void warnActionBar(Player player, String message) {
         warnings++;
+        lastWarning = message;
     }
 }

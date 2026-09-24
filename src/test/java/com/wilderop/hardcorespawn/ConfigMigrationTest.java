@@ -119,6 +119,10 @@ class ConfigMigrationTest extends PluginTestBase {
                 "migrated config must contain the solo-kills key");
         assertFalse(migrated.isSet("milestone-spawner-every"),
                 "the old quest-count milestone keys must be gone after migration");
+        assertTrue(migrated.isSet("messages.solitude-actionbar"),
+                "migrated config must contain the solitude action-bar message");
+        assertTrue(migrated.isSet("messages.solo-kill-denied"),
+                "migrated config must contain the solo-kill denial message");
     }
 
     @Test

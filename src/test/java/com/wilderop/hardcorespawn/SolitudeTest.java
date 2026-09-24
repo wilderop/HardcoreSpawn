@@ -73,6 +73,35 @@ class SolitudeTest extends PluginTestBase {
     }
 
     @Test
+    void crowdedRunnerGetsFrozenActionBarEveryTick() {
+        freshRuns();
+        alice.teleport(new Location(world, 100, 65, 100));
+        bob.teleport(new Location(world, 150, 65, 100)); // 50 blocks: crowded
+
+        int before = hud.warnings;
+        sessions().tickSolitude(System.currentTimeMillis());
+
+        assertTrue(sessionOf(alice).crowded);
+        assertTrue(hud.warnings > before, "crowded ticks must push an action bar");
+        assertNotNull(hud.lastWarning);
+        assertTrue(hud.lastWarning.contains("FROZEN"),
+                "action bar must say progress is frozen: " + hud.lastWarning);
+    }
+
+    @Test
+    void solitaryRunnerGetsNoFrozenActionBar() {
+        freshRuns();
+        alice.teleport(new Location(world, 100, 65, 100));
+        bob.teleport(new Location(world, 2500, 65, 2500));
+
+        int before = hud.warnings;
+        sessions().tickSolitude(System.currentTimeMillis());
+
+        assertFalse(sessionOf(alice).crowded);
+        assertEquals(before, hud.warnings, "solitary ticks must not warn");
+    }
+
+    @Test
     void distantRunnersAreNotCrowded() {
         freshRuns();
         alice.teleport(new Location(world, 100, 65, 100));
