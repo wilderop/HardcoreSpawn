@@ -6,7 +6,7 @@
 # backed up to config.yml.bak on startup: your settings carry over, but the
 # messages section and the quest bands are refreshed to the new format.
 # Never change this yourself.
-config-version: 10
+config-version: 11
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
@@ -194,6 +194,7 @@ messages:
   quit: "§cYou forfeited your run at level {level}. Your original inventory was restored; everything you gained is gone."
   death: "§cYour hardcore run ended at level {level}. Your original inventory was restored; everything you gained is gone."
   disconnect-death: "§cYou were gone too long. Your hardcore run ended at level {level}."
+  snapshot-recovered: "§aYour pre-run inventory and location were recovered. Welcome back!"
   welcome-back: "§eWelcome back. Your quest clock kept ticking while you were gone!"
   welcome-back-paused: "§eWelcome back. Your run was paused during the restart — the clock is ticking again!"
   timeout-warning: "§cThe wilds hunger... complete your quest or die!"
@@ -209,3 +210,5 @@ messages:
   admin-no-player: "Player '{player}' is not in a hardcore run."
   admin-unknown-player: "No player named '{player}' has ever joined this server."
   admin-nothing-to-reset: "Player '{player}' has no hardcore data to reset."
+  admin-restore: "Restored pre-run snapshot for {player}."
+  admin-nothing-to-restore: "Player '{player}' has no stored pre-run snapshot."

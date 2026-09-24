@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** /hardcoreadmin <reset <player>|reload> */
+/** /hardcoreadmin <reset <player>|restore <player>|reload> */
 public final class HardcoreAdminCommand implements CommandExecutor, TabCompleter {
     private final HardcoreSpawn plugin;
     private final SessionManager sessions;
@@ -68,6 +68,39 @@ public final class HardcoreAdminCommand implements CommandExecutor, TabCompleter
                 plugin.reloadHardcoreConfig();
                 sender.sendMessage(config().format("admin-reload", Map.of()));
             }
+            case "restore" -> {
+                if (args.length < 2) {
+                    sender.sendMessage("§cUsage: /hardcoreadmin restore <player>");
+                    return true;
+                }
+                UUID id;
+                String name;
+                Player target = Bukkit.getPlayerExact(args[1]);
+                if (target != null) {
+                    id = target.getUniqueId();
+                    name = target.getName();
+                } else {
+                    OfflinePlayer offline = Bukkit.getOfflinePlayer(args[1]);
+                    if (!offline.hasPlayedBefore()) {
+                        sender.sendMessage(config().format("admin-unknown-player", Map.of("player", args[1])));
+                        return true;
+                    }
+                    id = offline.getUniqueId();
+                    name = offline.getName() != null ? offline.getName() : args[1];
+                }
+                if (sessions.hasSession(id)) {
+                    // The snapshot is their pre-run state; restoring it
+                    // mid-run would destroy the run.
+                    sender.sendMessage("§c" + name
+                            + " has an active hardcore run — end it before restoring their snapshot.");
+                    return true;
+                }
+                if (sessions.restoreSnapshot(id)) {
+                    sender.sendMessage(config().format("admin-restore", Map.of("player", name)));
+                } else {
+                    sender.sendMessage(config().format("admin-nothing-to-restore", Map.of("player", name)));
+                }
+            }
             default -> sender.sendMessage("§cUsage: " + command.getUsage());
         }
         return true;
@@ -76,7 +109,7 @@ public final class HardcoreAdminCommand implements CommandExecutor, TabCompleter
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return List.of("reset", "reload").stream()
+            return List.of("reset", "restore", "reload").stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .toList();
         }

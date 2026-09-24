@@ -196,9 +196,21 @@ public final class SnapshotManager {
         return loadAll().containsKey(id.toString());
     }
 
+    /** Every player ID with a snapshot on disk or in memory. */
+    public java.util.Set<UUID> snapshotIds() {
+        java.util.Set<UUID> ids = new java.util.HashSet<>(memory.keySet());
+        for (String key : loadAll().keySet()) {
+            try {
+                ids.add(UUID.fromString(key));
+            } catch (IllegalArgumentException ignored) {
+                // Corrupt key: peek()/forget() deal with entries individually.
+            }
+        }
+        return ids;
+    }
+
     /** Load the persisted snapshot without removing it. */
-    public Snapshot peek(UUID id) {
-        Snapshot s = memory.get(id);
+    public Snapshot peek(UUID id) {        Snapshot s = memory.get(id);
         if (s != null) {
             return s;
         }

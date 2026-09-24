@@ -28,8 +28,30 @@ import java.util.UUID;
  */
 public final class SessionManager {
 
-    /** A snapshot restore waiting for a respawn or a rejoin. */
-    public record PendingRestore(Snapshot snapshot, Location returnLocation, String messageKey, int level) {}
+    /**
+     * A snapshot restore waiting for a respawn or a rejoin. The return point
+     * is stored as a world name plus coordinates, NOT a Bukkit Location: at
+     * plugin enable time (STARTUP load order) no worlds are loaded yet, so
+     * resolving the world eagerly would silently drop every pending restore
+     * on every restart. The world is resolved when the restore is applied.
+     */
+    public record PendingRestore(Snapshot snapshot, String worldName, double x, double y, double z,
+                                 float yaw, float pitch, String messageKey, int level) {
+        /** Build from a live location (its world must be loaded). */
+        public PendingRestore(Snapshot snapshot, Location returnLocation, String messageKey, int level) {
+            this(snapshot, returnLocation.getWorld().getName(), returnLocation.getX(), returnLocation.getY(),
+                    returnLocation.getZ(), returnLocation.getYaw(), returnLocation.getPitch(), messageKey, level);
+        }
+
+        /** Resolve the return location now that worlds are loaded; null if the world is gone. */
+        public Location returnLocation() {
+            World world = Bukkit.getWorld(worldName);
+            if (world == null) {
+                return null;
+            }
+            return new Location(world, x, y, z, yaw, pitch);
+        }
+    }
 
     /**
      * A run start counting down: the player must stand still and take no
@@ -1074,7 +1096,15 @@ public final class SessionManager {
                 snapshots.restoreDeathStats(player, restore.snapshot());
             }
         }
-        player.teleport(restore.returnLocation());
+        Location loc = restore.returnLocation();
+        if (loc != null) {
+            player.teleport(loc);
+        } else {
+            // Fail open: the items and XP are already back; never strand the
+            // restore just because the world is missing.
+            plugin.getLogger().severe("Could not return " + player.getName() + " to world '"
+                    + restore.worldName() + "' (not loaded); inventory was still restored.");
+        }
         player.sendMessage(config.format(restore.messageKey(), Map.of("level", String.valueOf(restore.level()))));
     }
 
@@ -1376,13 +1406,12 @@ public final class SessionManager {
         yaml.set(key + ".player", id.toString());
         yaml.set(key + ".messageKey", r.messageKey());
         yaml.set(key + ".level", r.level());
-        Location loc = r.returnLocation();
-        yaml.set(key + ".return.world", loc.getWorld().getName());
-        yaml.set(key + ".return.x", loc.getX());
-        yaml.set(key + ".return.y", loc.getY());
-        yaml.set(key + ".return.z", loc.getZ());
-        yaml.set(key + ".return.yaw", loc.getYaw());
-        yaml.set(key + ".return.pitch", loc.getPitch());
+        yaml.set(key + ".return.world", r.worldName());
+        yaml.set(key + ".return.x", r.x());
+        yaml.set(key + ".return.y", r.y());
+        yaml.set(key + ".return.z", r.z());
+        yaml.set(key + ".return.yaw", r.yaw());
+        yaml.set(key + ".return.pitch", r.pitch());
         // The snapshot itself lives in snapshots.yml keyed by player UUID.
     }
 
@@ -1399,6 +1428,64 @@ public final class SessionManager {
         loadRestoreSection(yaml, "respawn", pendingOfflineRestores);
     }
 
+    /**
+     * Recover snapshots orphaned by the pre-1.10.2 restart bug: pending
+     * restores were dropped at enable time because no worlds were loaded yet,
+     * and the next shutdown then wiped them from restores.yml. Any snapshot
+     * with no live session and no queued restore is a player's pre-run state
+     * that was never given back — queue it for their next join. Idempotent.
+     * Call after {@link #loadSessions()} and {@link #loadRestores()}.
+     */
+    public void recoverOrphanedSnapshots() {
+        boolean added = false;
+        for (UUID id : snapshots.snapshotIds()) {
+            if (sessions.containsKey(id)) {
+                continue;
+            }
+            if (pendingOfflineRestores.containsKey(id) || pendingRespawnRestores.containsKey(id)) {
+                continue;
+            }
+            Snapshot snap = snapshots.peek(id);
+            if (snap == null || snap.worldName == null) {
+                continue;
+            }
+            pendingOfflineRestores.put(id, new PendingRestore(snap, snap.worldName, snap.x, snap.y, snap.z,
+                    snap.yaw, snap.pitch, "snapshot-recovered", 0));
+            plugin.getLogger().warning("Recovered orphaned pre-run snapshot for " + id
+                    + ": it will be restored on their next join.");
+            added = true;
+        }
+        if (added) {
+            saveRestores();
+        }
+    }
+
+    /**
+     * Admin backstop: restore a player's snapshot now (online) or queue it
+     * for their next join (offline). Refuses while they have an active run —
+     * the snapshot is their pre-run state, and restoring it mid-run would
+     * destroy the run. Returns false when there is nothing to restore.
+     */
+    public boolean restoreSnapshot(UUID id) {
+        if (sessions.containsKey(id)) {
+            return false;
+        }
+        Snapshot snap = snapshots.peek(id);
+        if (snap == null || snap.worldName == null) {
+            return false;
+        }
+        PendingRestore restore = new PendingRestore(snap, snap.worldName, snap.x, snap.y, snap.z,
+                snap.yaw, snap.pitch, "snapshot-recovered", 0);
+        Player player = Bukkit.getPlayer(id);
+        if (player != null && player.isOnline() && !player.isDead()) {
+            applyRestore(player, restore);
+        } else {
+            pendingOfflineRestores.put(id, restore);
+        }
+        saveRestores();
+        return true;
+    }
+
     private void loadRestoreSection(YamlConfiguration yaml, String sectionName,
                                     Map<UUID, PendingRestore> target) {
         var section = yaml.getConfigurationSection(sectionName);
@@ -1410,19 +1497,22 @@ public final class SessionManager {
                 UUID id = UUID.fromString(section.getString(key + ".player"));
                 Snapshot snapshot = snapshots.peek(id);
                 if (snapshot == null) {
+                    // Never silently drop: a skipped entry is a player's
+                    // inventory that never comes back.
+                    plugin.getLogger().warning("Skipping restore entry " + key + " for " + id
+                            + ": no snapshot found in snapshots.yml.");
                     continue;
                 }
-                String worldName = section.getString(key + ".return.world");
-                World world = Bukkit.getWorld(worldName);
-                if (world == null) {
-                    continue;
-                }
-                Location ret = new Location(world,
+                // The world is deliberately NOT resolved here. Plugins with the
+                // default STARTUP load order enable before any world exists, so
+                // resolving now would drop every pending restore on restart.
+                // PendingRestore resolves it lazily when the restore is applied.
+                target.put(id, new PendingRestore(
+                        snapshot, section.getString(key + ".return.world"),
                         section.getDouble(key + ".return.x"), section.getDouble(key + ".return.y"),
                         section.getDouble(key + ".return.z"),
-                        (float) section.getDouble(key + ".return.yaw"), (float) section.getDouble(key + ".return.pitch"));
-                target.put(id, new PendingRestore(
-                        snapshot, ret, section.getString(key + ".messageKey", "death"),
+                        (float) section.getDouble(key + ".return.yaw"), (float) section.getDouble(key + ".return.pitch"),
+                        section.getString(key + ".messageKey", "death"),
                         section.getInt(key + ".level")));
             } catch (Exception e) {
                 plugin.getLogger().warning("Skipping corrupt restore entry " + key + ": " + e.getMessage());

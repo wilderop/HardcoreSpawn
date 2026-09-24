@@ -123,6 +123,12 @@ class ConfigMigrationTest extends PluginTestBase {
                 "migrated config must contain the solitude action-bar message");
         assertTrue(migrated.isSet("messages.solo-kill-denied"),
                 "migrated config must contain the solo-kill denial message");
+        assertTrue(migrated.isSet("messages.snapshot-recovered"),
+                "migrated config must contain the snapshot-recovered message");
+        assertTrue(migrated.isSet("messages.admin-restore"),
+                "migrated config must contain the admin-restore message");
+        assertTrue(migrated.isSet("messages.admin-nothing-to-restore"),
+                "migrated config must contain the admin-nothing-to-restore message");
     }
 
     @Test

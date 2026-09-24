@@ -1,5 +1,6 @@
 package com.wilderop.hardcorespawn;
 
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -82,7 +83,10 @@ public final class SessionListener implements Listener {
         if (restore == null) {
             return;
         }
-        event.setRespawnLocation(restore.returnLocation());
+        Location respawnAt = restore.returnLocation();
+        if (respawnAt != null) {
+            event.setRespawnLocation(respawnAt);
+        }
         snapshots.clearPlayer(player);
         if (restore.snapshot() != null) {
             snapshots.restore(player, restore.snapshot());

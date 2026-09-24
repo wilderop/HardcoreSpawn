@@ -1,5 +1,5 @@
 name: HardcoreSpawn
-version: 1.10.1
+version: 1.10.2
 main: com.wilderop.hardcorespawn.HardcoreSpawn
 api-version: '1.21'
 author: wilderop
@@ -11,7 +11,7 @@ commands:
     permission: hardcore.use
   hardcoreadmin:
     description: Administer HardcoreSpawn runs.
-    usage: /hardcoreadmin <reset <player>|reload>
+    usage: /hardcoreadmin <reset <player>|restore <player>|reload>
     permission: hardcore.admin
 permissions:
   hardcore.use:
