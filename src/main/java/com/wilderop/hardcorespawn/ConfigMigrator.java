@@ -26,7 +26,7 @@ import java.util.logging.Logger;
  */
 public final class ConfigMigrator {
     /** Bump this whenever the bundled config changes incompatibly. */
-    public static final int CURRENT_VERSION = 8;
+    public static final int CURRENT_VERSION = 9;
 
     private ConfigMigrator() {}
 

@@ -6,6 +6,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -18,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 
 /**
@@ -120,6 +122,17 @@ public final class SessionManager {
     public boolean hasSession(UUID id) { return sessions.containsKey(id); }
     public Session getSession(UUID id) { return sessions.get(id); }
 
+    /** Test-only: drop all sessions and transient maps (the MockBukkit server is shared per test class). */
+    void clearSessionsForTests() {
+        sessions.clear();
+        pendingConfirms.clear();
+        pendingStarts.clear();
+        pendingRespawnRestores.clear();
+        pendingOfflineRestores.clear();
+        entityDamage.clear();
+        entityDamageSeenMs.clear();
+    }
+
     /** Copy of active sessions for safe iteration. */
     public List<Session> sessionsSnapshot() { return new ArrayList<>(sessions.values()); }
 
@@ -137,6 +150,9 @@ public final class SessionManager {
         }
         pendingConfirms.put(id, System.currentTimeMillis());
         player.sendMessage(config.format("confirm-prompt", startPlaceholders()));
+        if (config.isHighScorePrizeEnabled()) {
+            player.sendMessage(config.message("highscore-prize-announce"));
+        }
     }
 
     public boolean confirmStart(Player player) {
@@ -180,7 +196,7 @@ public final class SessionManager {
     }
 
     /**
-     * The run actually begins: snapshot, clear, teleport to spawn, quest 1.
+     * The run actually begins: snapshot, clear, scatter into the wilds, quest 1.
      * Called either instantly (freeze disabled) or when a start countdown
      * completes cleanly.
      */
@@ -199,14 +215,14 @@ public final class SessionManager {
         sessions.put(id, session);
         snapshots.clearPlayer(player);
 
-        Location spawn = spawnLocation();
-        if (!player.teleport(spawn)) {
-            // The spawn teleport failed or was cancelled: roll the run back
+        Location start = scatterStartLocation();
+        if (!player.teleport(start)) {
+            // The scatter teleport failed or was cancelled: roll the run back
             // entirely rather than leaving the player cleared at their old
             // location with an active session.
             sessions.remove(id);
             snapshots.restore(player, snapshot);
-            plugin.getLogger().warning("Spawn teleport failed for " + player.getName() + "; run cancelled and inventory restored.");
+            plugin.getLogger().warning("Scatter teleport failed for " + player.getName() + "; run cancelled and inventory restored.");
             player.sendMessage(config.format("teleport-failed", Map.of()));
             return false;
         }
@@ -356,7 +372,20 @@ public final class SessionManager {
         return value == Math.rint(value) ? String.valueOf((long) value) : String.valueOf(value);
     }
 
-    private Location spawnLocation() {
+    /**
+     * Pick the run start point. With scatter enabled (default) this is a
+     * random wilderness spot in a ring around 0,0, so nobody can pre-stage
+     * gear at the start point; with scatter disabled it is the world spawn.
+     */
+    private Location scatterStartLocation() {
+        return scatterStartLocation(java.util.concurrent.ThreadLocalRandom.current());
+    }
+
+    /**
+     * Test seam: inject the RNG. Draw order is fixed — angle first, then
+     * distance — so tests can replicate the draw with the same seed.
+     */
+    Location scatterStartLocation(Random rng) {
         World world = Bukkit.getWorld("world");
         if (world == null && !Bukkit.getWorlds().isEmpty()) {
             world = Bukkit.getWorlds().get(0);
@@ -364,6 +393,46 @@ public final class SessionManager {
         if (world == null) {
             throw new IllegalStateException("No world loaded");
         }
+        if (!config.isScatterStartEnabled()) {
+            return spawnCenter(world);
+        }
+        double min = config.getScatterMinDistance();
+        double max = Math.max(min + 1.0, config.getScatterMaxDistance());
+        for (int attempt = 0; attempt < 24; attempt++) {
+            double angle = rng.nextDouble() * Math.PI * 2.0;
+            double dist = min + rng.nextDouble() * (max - min);
+            int x = (int) Math.round(Math.cos(angle) * dist);
+            int z = (int) Math.round(Math.sin(angle) * dist);
+            Location spot = safeGround(world, x, z);
+            if (spot != null) {
+                return spot;
+            }
+        }
+        plugin.getLogger().warning("[HardcoreSpawn] No safe scatter ground found; starting at spawn.");
+        return spawnCenter(world);
+    }
+
+    /** Highest safe standing spot at the given XZ, or null. Never throws. */
+    private static Location safeGround(World world, int x, int z) {
+        try {
+            int topY = world.getHighestBlockYAt(x, z);
+            Block ground = world.getBlockAt(x, topY, z);
+            Material type = ground.getType();
+            if (!type.isSolid() || type == Material.LAVA || type == Material.WATER) {
+                return null;
+            }
+            Block feet = world.getBlockAt(x, topY + 1, z);
+            Block head = world.getBlockAt(x, topY + 2, z);
+            if (!feet.getType().isAir() || !head.getType().isAir()) {
+                return null;
+            }
+            return new Location(world, x + 0.5, topY + 1.0, z + 0.5);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Location spawnCenter(World world) {
         Location spawn = world.getSpawnLocation().clone();
         spawn.add(0.5, 0.5, 0.5);
         return spawn;
@@ -458,8 +527,8 @@ public final class SessionManager {
 
     public void addProgress(Player player, QuestType type, String target, int amount) {
         Session s = sessions.get(player.getUniqueId());
-        if (s == null || s.hand.isEmpty()) {
-            return;
+        if (s == null || s.hand.isEmpty() || s.crowded) {
+            return; // crowded: the wilds freeze progress while the clock burns
         }
         boolean moved = false;
         List<Quest> completed = new ArrayList<>();
@@ -484,8 +553,8 @@ public final class SessionManager {
     /** Scan the inventory for OBTAIN objectives. Called every tick. */
     public void checkObtain(Player player) {
         Session s = sessions.get(player.getUniqueId());
-        if (s == null || s.hand.isEmpty()) {
-            return;
+        if (s == null || s.hand.isEmpty() || s.crowded) {
+            return; // crowded: the wilds freeze progress while the clock burns
         }
         boolean moved = false;
         for (Quest q : s.hand) {
@@ -509,8 +578,122 @@ public final class SessionManager {
         }
     }
 
-    private int countMaterial(Player player, String materialName) {
-        final Material material;
+    // ------------------------------------------------------------------
+    // Solitude: quest progress freezes while another runner is nearby.
+    // Pairwise distance checks over active runners only — cheap for any
+    // realistic runner count. Runs every second from TimerTask.
+    // ------------------------------------------------------------------
+
+    /**
+     * Recompute the crowded flag for every active runner: crowded while any
+     * other runner is within the solitude radius in the same world. Sends a
+     * notice on transitions. Also prunes stale solo-kill damage records.
+     */
+    public void tickSolitude(long now) {
+        pruneDamageRecords(now);
+        if (!config.isSolitudeEnabled()) {
+            for (Session s : sessions.values()) {
+                s.crowded = false;
+            }
+            return;
+        }
+        double r2 = config.getSolitudeRadiusBlocks();
+        r2 *= r2;
+        List<Session> active = new ArrayList<>();
+        Map<UUID, Player> players = new HashMap<>();
+        for (Session s : sessions.values()) {
+            Player p = Bukkit.getPlayer(s.playerId);
+            if (p == null || !p.isOnline()) {
+                continue;
+            }
+            active.add(s);
+            players.put(s.playerId, p);
+        }
+        for (Session s : active) {
+            Player p = players.get(s.playerId);
+            boolean crowded = false;
+            for (Session o : active) {
+                if (o == s) {
+                    continue;
+                }
+                Player q = players.get(o.playerId);
+                if (!p.getWorld().equals(q.getWorld())) {
+                    continue;
+                }
+                if (p.getLocation().distanceSquared(q.getLocation()) <= r2) {
+                    crowded = true;
+                    break;
+                }
+            }
+            if (crowded != s.crowded) {
+                s.crowded = crowded;
+                p.sendMessage(config.format(crowded ? "solitude-notice" : "solitude-clear", Map.of()));
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Solo kills: kill quests need a majority of the player-dealt damage.
+    // ------------------------------------------------------------------
+
+    /** Damage older than this is forgotten (bounds the damage map). */
+    private static final long DAMAGE_MEMORY_MS = 5 * 60 * 1000L;
+
+    /** Entity -> (player -> damage dealt). Small: only recent combat. */
+    private final Map<UUID, Map<UUID, Double>> entityDamage = new HashMap<>();
+    private final Map<UUID, Long> entityDamageSeenMs = new HashMap<>();
+
+    /** Seam fed by the damage listener; test code can drive it directly. */
+    public void recordPlayerDamage(UUID entityId, UUID playerId, double damage, long now) {
+        if (!hasSession(playerId) || damage <= 0) {
+            return;
+        }
+        entityDamage.computeIfAbsent(entityId, k -> new HashMap<>())
+                .merge(playerId, damage, Double::sum);
+        entityDamageSeenMs.put(entityId, now);
+    }
+
+    /**
+     * True when the killer's share of the tracked player-dealt damage is a
+     * strict majority — or when nothing was tracked (fail open for genuine
+     * solo kills; a helper's damage would always be tracked).
+     */
+    public boolean isSoloKill(UUID entityId, UUID playerId) {        if (!config.isSoloKillsEnabled()) {
+            return true;
+        }
+        Map<UUID, Double> byPlayer = entityDamage.get(entityId);
+        if (byPlayer == null || byPlayer.isEmpty()) {
+            return true;
+        }
+        double mine = byPlayer.getOrDefault(playerId, 0.0);
+        double total = 0.0;
+        for (double d : byPlayer.values()) {
+            total += d;
+        }
+        return total > 0.0 && mine > total / 2.0;
+    }
+
+    /** Drop a dead entity's damage record. */
+    public void forgetEntityDamage(UUID entityId) {
+        entityDamage.remove(entityId);
+        entityDamageSeenMs.remove(entityId);
+    }
+
+    private void pruneDamageRecords(long now) {
+        if (entityDamageSeenMs.isEmpty()) {
+            return;
+        }
+        var it = entityDamageSeenMs.entrySet().iterator();
+        while (it.hasNext()) {
+            var e = it.next();
+            if (now - e.getValue() > DAMAGE_MEMORY_MS) {
+                it.remove();
+                entityDamage.remove(e.getKey());
+            }
+        }
+    }
+
+    private int countMaterial(Player player, String materialName) {        final Material material;
         try {
             material = Material.valueOf(materialName);
         } catch (IllegalArgumentException e) {
@@ -540,20 +723,25 @@ public final class SessionManager {
         long bonusMs = config.getQuestCompleteBonusSeconds() * 1000L;
         player.sendMessage(config.format("quest-complete",
                 Map.of("bonus", config.formatTime(bonusMs))));
-        int every = config.getMilestoneEggEvery();
-        if (every > 0 && s.questsCompleted % every == 0) {
-            grantMilestoneEgg(player, s.questsCompleted);
-        }
-        int spawnerEvery = config.getMilestoneSpawnerEvery();
-        if (spawnerEvery > 0 && s.questsCompleted % spawnerEvery == 0) {
-            grantMilestoneSpawner(player, s.questsCompleted);
-        }
         List<String> excluded = new ArrayList<>(completed.templateIds());
         for (Quest q : s.hand) {
             excluded.addAll(q.templateIds());
         }
         Quest replacement = quests.generate(s.level + 1, excluded);
         s.hand.add(replacement);
+        // New personal best level (same level the leaderboard records) wins
+        // the high-score prize: a spawner block plus a spawn egg.
+        int reached = reachedLevel(s);
+        if (config.isHighScorePrizeEnabled()) {
+            LeaderboardManager.Stats stats = leaderboard.stats(player.getUniqueId());
+            if (reached > stats.bestLevel) {
+                // Record the new best immediately so each further level in
+                // this record run awards again.
+                stats.bestLevel = reached;
+                leaderboard.save();
+                grantHighScorePrize(player, reached);
+            }
+        }
         discord.sendQuestCompleted(player.getName(), completed.getDescription(),
                 replacement.getDescription(), s.questsCompleted, reachedLevel(s));
         long now = System.currentTimeMillis();
@@ -569,43 +757,28 @@ public final class SessionManager {
     }
 
     /**
-     * Milestone prize: a random mob spawn egg. It lands in the run inventory
-     * like any other gain — lost on death unless banked in a world chest.
+     * High-score prize: a new personal best level awards BOTH an empty mob
+     * spawner block and a random mob spawn egg. Right-clicking the spawner
+     * with an egg sets what it spawns. Like all run loot they must be banked
+     * in a world chest or they are lost on death; a full inventory drops
+     * them at the player's feet.
      */
-    private void grantMilestoneEgg(Player player, int questsCompleted) {
+    private void grantHighScorePrize(Player player, int level) {
         Material egg = MILESTONE_EGGS.get(
                 java.util.concurrent.ThreadLocalRandom.current().nextInt(MILESTONE_EGGS.size()));
-        ItemStack stack = new ItemStack(egg, 1);
-        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
+        ItemStack spawner = new ItemStack(Material.SPAWNER, 1);
+        ItemStack eggStack = new ItemStack(egg, 1);
+        HashMap<Integer, ItemStack> leftover =
+                player.getInventory().addItem(spawner, eggStack);
         String mobName = toMobName(egg);
+        Map<String, String> ph = Map.of("level", String.valueOf(level), "mob", mobName);
         if (!leftover.isEmpty()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), stack);
-            player.sendMessage(config.format("milestone-egg-dropped", Map.of(
-                    "count", String.valueOf(questsCompleted),
-                    "mob", mobName)));
+            for (ItemStack item : leftover.values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), item);
+            }
+            player.sendMessage(config.format("highscore-prize-dropped", ph));
         } else {
-            player.sendMessage(config.format("milestone-egg", Map.of(
-                    "count", String.valueOf(questsCompleted),
-                    "mob", mobName)));
-        }
-    }
-
-    /**
-     * Milestone prize: an empty mob spawner block. Right-clicking it with a
-     * spawn egg sets what it spawns, so it pairs with the milestone eggs.
-     * Like all run loot it must be banked in a world chest or it is lost on
-     * death; a full inventory drops it at the player's feet.
-     */
-    private void grantMilestoneSpawner(Player player, int questsCompleted) {
-        ItemStack stack = new ItemStack(Material.SPAWNER, 1);
-        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
-        if (!leftover.isEmpty()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), stack);
-            player.sendMessage(config.format("milestone-spawner-dropped", Map.of(
-                    "count", String.valueOf(questsCompleted))));
-        } else {
-            player.sendMessage(config.format("milestone-spawner", Map.of(
-                    "count", String.valueOf(questsCompleted))));
+            player.sendMessage(config.format("highscore-prize", ph));
         }
     }
 

@@ -43,6 +43,9 @@ public abstract class PluginTestBase {
             world = server.addSimpleWorld("world");
         }
         world.setSpawnLocation(0, 64, 0);
+        // The MockBukkit server (and SessionManager) is shared per test class:
+        // drop stale sessions so tests are hermetic.
+        plugin.getSessionManager().clearSessionsForTests();
     }
 
     protected PlayerMock newPlayer() {

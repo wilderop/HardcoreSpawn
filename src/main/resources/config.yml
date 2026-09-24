@@ -6,7 +6,7 @@
 # backed up to config.yml.bak on startup: your settings carry over, but the
 # messages section and the quest bands are refreshed to the new format.
 # Never change this yourself.
-config-version: 8
+config-version: 9
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
@@ -18,12 +18,29 @@ hud:
     enabled: true   # set false if another plugin owns the sidebar
     title: "§6§lHARDCORE §r§7Lv {level}"
 
-# Every N completed quests grants a random mob spawn egg (0 disables).
-milestone-egg-every: 30
+# A new personal best level immediately awards BOTH a mob spawner block and a
+# random mob spawn egg (right-click the spawner with an egg to choose what it
+# spawns). Set false to disable.
+highscore-prize:
+  enabled: true
 
-# Every N completed quests grants an (empty) mob spawner block (0 disables).
-# Right-click it with a spawn egg to choose what it spawns.
-milestone-spawner-every: 60
+# Run starts scatter you into the wilds instead of spawning at the world
+# spawn, so nobody can pre-stage gear at the start point.
+scatter-start:
+  enabled: true
+  min-distance: 2000.0  # inner edge of the scatter ring (XZ blocks from 0,0)
+  max-distance: 6000.0  # outer edge of the scatter ring
+
+# The wilds only reward the solitary: while another runner is within
+# radius-blocks, quest progress freezes (the quest clock keeps burning).
+solitude:
+  enabled: true
+  radius-blocks: 128
+
+# Kill quests only count when the runner dealt the majority of the mob's
+# player-dealt damage themselves (no kill carries).
+solo-kills:
+  enabled: true
 
 # How quest amounts scale per level: amount = base * growth^(level-1)
 difficulty-growth: 1.3
@@ -48,7 +65,7 @@ start:
   center-x: 0.0
   center-z: 0.0
   # Anti-combat-escape: /hardcore confirm starts a stand-still countdown
-  # instead of starting instantly (starting teleports you to spawn). Take no
+  # instead of starting instantly (starting scatters you into the wilds). Take no
   # damage and don't move for the whole window, or the start is cancelled.
   # 0 disables the freeze (runs start instantly, as before).
   freeze-seconds: 10
@@ -150,11 +167,12 @@ bands:
 
 messages:
   prefix: "§8[§cHardcore§8]§r "
-  confirm-prompt: "§cYou are about to begin a hardcore run. Your inventory will be stored and you will be sent to spawn with nothing. Type §e/hardcore confirm§c within 60 seconds to accept, or walk away. §7(Requires: at least {radius} blocks from ({center-x}, {center-z}), or a fully empty inventory and ender chest.)"
+  confirm-prompt: "§cYou are about to begin a hardcore run. Your inventory will be stored and you will be scattered into the wilds with nothing. Type §e/hardcore confirm§c within 60 seconds to accept, or walk away. §7(Requires: at least {radius} blocks from ({center-x}, {center-z}), or a fully empty inventory and ender chest.)"
   confirm-expired: "§cYour hardcore request expired. Type /hardcore to try again."
   start-denied-too-close: "§cTravel at least {radius} blocks from ({center-x}, {center-z}), or empty your inventory and ender chest first."
   already-running: "§cYou are already in a hardcore run!"
-  teleport-failed: "§cCould not teleport you to spawn. Run cancelled — your inventory was restored."
+  teleport-failed: "§cCould not scatter you into the wilds. Run cancelled — your inventory was restored."
+  highscore-prize-announce: "§6★ Set a new personal high score and win a §bMob Spawner §6+ §dSpawn Egg§6!"
   confirm-freeze-start: "§eStand still for {seconds} seconds! Take no damage and your run will begin."
   confirm-freeze-title: "§c§l{seconds}"
   confirm-freeze-subtitle: "§eStay still!"
@@ -167,10 +185,10 @@ messages:
   leaderboard-entry: "§e#{rank} §f{name} §7— best level §e{best}§7, {quests} quests in {runs} runs"
   leaderboard-empty: "§7No hardcore runs recorded yet. Type §e/hardcore §7if you dare."
   quest-complete: "§aQuest complete! §e{bonus} §aadded to the clock — pick your next quest!"
-  milestone-egg: "§6★ Milestone! §e{count} quests completed — you earned a §b{mob} Spawn Egg§e!"
-  milestone-egg-dropped: "§6★ Milestone! §e{count} quests completed — your §b{mob} Spawn Egg§e dropped at your feet (inventory full)!"
-  milestone-spawner: "§6★ Milestone! §e{count} quests completed — you earned a §bMob Spawner§e! Right-click it with a spawn egg to choose what it spawns."
-  milestone-spawner-dropped: "§6★ Milestone! §e{count} quests completed — your §bMob Spawner§e dropped at your feet (inventory full)!"
+  highscore-prize: "§6★ New high score! §eLevel {level}§6 — you earned a §bMob Spawner §6and a §d{mob} Spawn Egg§6!"
+  highscore-prize-dropped: "§6★ New high score! §eLevel {level}§6 — your §bMob Spawner §6and §dSpawn Egg §6dropped at your feet (inventory full)!"
+  solitude-notice: "§cThe wilds watch — another runner is near. Quest progress is frozen; find solitude!"
+  solitude-clear: "§aThe wilds look away. Quest progress resumes."
   quit: "§cYou forfeited your run at level {level}. Your original inventory was restored; everything you gained is gone."
   death: "§cYour hardcore run ended at level {level}. Your original inventory was restored; everything you gained is gone."
   disconnect-death: "§cYou were gone too long. Your hardcore run ended at level {level}."

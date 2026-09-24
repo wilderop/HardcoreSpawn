@@ -48,17 +48,49 @@ public final class HardcoreConfig {
     }
 
     /**
-     * Every N completed quests grants a random mob spawn egg (0 disables).
+     * A new personal best level immediately awards a mob spawner block AND a
+     * random mob spawn egg (false disables).
      */
-    public int getMilestoneEggEvery() {
-        return cfg.getInt("milestone-egg-every", 30);
+    public boolean isHighScorePrizeEnabled() {
+        return cfg.getBoolean("highscore-prize.enabled", true);
     }
 
     /**
-     * Every N completed quests grants an empty mob spawner block (0 disables).
+     * Run starts scatter the player into the wilds instead of spawning at the
+     * world spawn, so nobody can pre-stage gear at the start point.
      */
-    public int getMilestoneSpawnerEvery() {
-        return cfg.getInt("milestone-spawner-every", 60);
+    public boolean isScatterStartEnabled() {
+        return cfg.getBoolean("scatter-start.enabled", true);
+    }
+
+    /** Inner edge of the scatter ring (XZ blocks from 0,0). */
+    public double getScatterMinDistance() {
+        return cfg.getDouble("scatter-start.min-distance", 2000.0);
+    }
+
+    /** Outer edge of the scatter ring (XZ blocks from 0,0). */
+    public double getScatterMaxDistance() {
+        return cfg.getDouble("scatter-start.max-distance", 6000.0);
+    }
+
+    /**
+     * The wilds only reward the solitary: while another runner is within
+     * radius blocks, quest progress freezes (the clock keeps burning).
+     */
+    public boolean isSolitudeEnabled() {
+        return cfg.getBoolean("solitude.enabled", true);
+    }
+
+    public double getSolitudeRadiusBlocks() {
+        return cfg.getDouble("solitude.radius-blocks", 128.0);
+    }
+
+    /**
+     * Kill quests only count when the runner dealt the majority of the
+     * mob's player-dealt damage themselves.
+     */
+    public boolean isSoloKillsEnabled() {
+        return cfg.getBoolean("solo-kills.enabled", true);
     }
 
     public double getDifficultyGrowth() {
@@ -95,7 +127,7 @@ public final class HardcoreConfig {
 
     /**
      * Stand-still seconds on /hardcore confirm before the run starts
-     * (anti-combat-escape: starting teleports you to spawn). 0 or less
+     * (anti-combat-escape: starting scatters you into the wilds). 0 or less
      * disables the freeze and runs start instantly.
      */
     public int getStartFreezeSeconds() {

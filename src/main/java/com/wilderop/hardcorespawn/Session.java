@@ -27,6 +27,9 @@ public final class Session {
     public boolean warned60;
     public boolean warned30;
     public boolean timeoutDamagePhase;
+    /** The wilds freeze quest progress while another runner is within the
+     * solitude radius. Recomputed every second; not persisted. */
+    public boolean crowded;
     public long nextDamageMs;
     // Frozen at shutdown so restart downtime counts against neither the quest
     // clock nor the disconnect grace period. questDeadlineMs == 0 while paused.

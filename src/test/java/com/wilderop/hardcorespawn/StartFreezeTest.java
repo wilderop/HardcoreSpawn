@@ -78,10 +78,12 @@ class StartFreezeTest extends PluginTestBase {
         assertFalse(sessions().isStartFrozen(id), "countdown must be over");
         assertTrue(sessions().hasSession(id), "clean countdown must start the run");
 
-        // The run starts exactly as before: snapshot taken, cleared, at spawn, quest 1.
+        // The run starts exactly as before: snapshot taken, cleared, scattered
+        // into the wilds, quest 1.
         assertNull(player.getInventory().getItem(0), "inventory must be cleared at run start");
-        assertEquals(0.5, player.getLocation().getX(), 0.001, "must be teleported to spawn");
-        assertEquals(0.5, player.getLocation().getZ(), 0.001, "must be teleported to spawn");
+        double scatterDist = Math.hypot(player.getLocation().getX(), player.getLocation().getZ());
+        assertTrue(scatterDist >= 2000.0 && scatterDist <= 6000.0,
+                "must be scattered into the wilds, got dist=" + scatterDist);
         Session session = sessions().getSession(id);
         assertEquals(Session.HAND_SIZE, session.hand.size(), "a full hand of quests must be dealt");
         for (Quest q : session.hand) {

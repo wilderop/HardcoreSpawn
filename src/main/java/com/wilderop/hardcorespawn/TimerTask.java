@@ -27,6 +27,8 @@ public final class TimerTask extends BukkitRunnable {
         HardcoreConfig config = sessions.getConfig();
         // Run-start countdowns tick even though their players have no session yet.
         sessions.tickStartCountdowns(now);
+        // Solitude: freeze quest progress while runners crowd each other.
+        sessions.tickSolitude(now);
         for (Session s : sessions.sessionsSnapshot()) {
             if (s.questDeadlineMs == 0 || s.hand.isEmpty()) {
                 continue; // paused across a restart, or no quests assigned yet

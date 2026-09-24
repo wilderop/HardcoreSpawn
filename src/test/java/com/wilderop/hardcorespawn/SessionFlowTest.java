@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** /hardcore -> /hardcore confirm flow: snapshot, clear, teleport to spawn. */
+/** /hardcore -> /hardcore confirm flow: snapshot, clear, scatter into the wilds. */
 class SessionFlowTest extends PluginTestBase {
 
     @Test
@@ -51,10 +51,11 @@ class SessionFlowTest extends PluginTestBase {
         // Ender chest wiped too (it is snapshotted and restored at run end).
         assertNull(player.getEnderChest().getItem(0), "ender chest must be wiped on run start");
 
-        // Teleported to server spawn.
-        Location spawn = world.getSpawnLocation();
-        assertEquals(spawn.getWorld().getName(), player.getLocation().getWorld().getName());
-        assertEquals(spawn.getBlockX() + 0.5, player.getLocation().getX(), 0.001);
+        // Scattered into the wilds: inside the scatter ring, far from spawn.
+        assertEquals("world", player.getLocation().getWorld().getName());
+        double scatterDist = Math.hypot(player.getLocation().getX(), player.getLocation().getZ());
+        assertTrue(scatterDist >= 2000.0 && scatterDist <= 6000.0,
+                "run must start inside the scatter ring, got dist=" + scatterDist);
 
         // Return location recorded.
         assertEquals(before.getWorld().getName(), session.returnLocation.getWorld().getName());

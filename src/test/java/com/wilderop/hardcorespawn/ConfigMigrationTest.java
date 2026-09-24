@@ -109,8 +109,16 @@ class ConfigMigrationTest extends PluginTestBase {
         assertEquals(ConfigMigrator.CURRENT_VERSION, migrated.getInt("config-version"));
         assertEquals("https://example.com/real-hook", migrated.getString("discord-webhook-url"),
                 "webhook URL must survive migration");
-        assertTrue(migrated.isSet("milestone-spawner-every"),
-                "migrated config must contain the spawner milestone key");
+        assertTrue(migrated.isSet("highscore-prize.enabled"),
+                "migrated config must contain the high-score prize key");
+        assertTrue(migrated.isSet("scatter-start.enabled"),
+                "migrated config must contain the scatter-start key");
+        assertTrue(migrated.isSet("solitude.enabled"),
+                "migrated config must contain the solitude key");
+        assertTrue(migrated.isSet("solo-kills.enabled"),
+                "migrated config must contain the solo-kills key");
+        assertFalse(migrated.isSet("milestone-spawner-every"),
+                "the old quest-count milestone keys must be gone after migration");
     }
 
     @Test
