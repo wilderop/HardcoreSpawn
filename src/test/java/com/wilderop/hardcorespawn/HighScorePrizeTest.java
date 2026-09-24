@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -172,6 +173,18 @@ class HighScorePrizeTest extends PluginTestBase {
         completeOneBreakQuest(); // reached level 3 > 2: wins again
         assertTrue(hasItem(Material.SPAWNER), "a new run that sets a new record must win");
         assertTrue(hasSpawnEgg(), "a new run that sets a new record must win the egg");
+    }
+
+    @Test
+    void prizeMessageWarnsToBank() {
+        String msg = sessions().getConfig().format("highscore-prize",
+                Map.of("level", "2", "mob", "Pig"));
+        assertTrue(msg.toLowerCase(java.util.Locale.ROOT).contains("chest"),
+                "the prize message must tell the winner to bank it in a chest: " + msg);
+        String dropped = sessions().getConfig().format("highscore-prize-dropped",
+                Map.of("level", "2", "mob", "Pig"));
+        assertTrue(dropped.toLowerCase(java.util.Locale.ROOT).contains("chest"),
+                "the dropped-prize message must tell the winner to bank it in a chest: " + dropped);
     }
 
     @Test
