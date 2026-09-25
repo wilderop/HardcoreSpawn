@@ -107,6 +107,12 @@ public final class SessionManager {
     private final Map<UUID, PendingRestore> pendingRespawnRestores = new HashMap<>();
     private final Map<UUID, PendingRestore> pendingOfflineRestores = new HashMap<>();
     /**
+     * Players who ended a run with zero quests completed: their next run
+     * deals the same hand instead of fresh quests (no free re-rolls).
+     * Persisted in repeat-hands.yml.
+     */
+    private final Map<UUID, List<Quest>> repeatHands = new HashMap<>();
+    /**
      * Players with a deferred post-join restore already scheduled. Prevents
      * double-scheduling when a player rejoins while a deferred task is still
      * pending; entries are removed when the task fires.
@@ -483,22 +489,31 @@ public final class SessionManager {
      * templates) and start the quest clock.
      */
     private void assignInitialHand(Player player, Session session, long now) {
-        List<String> excluded = new ArrayList<>();
-        // One guaranteed easy starter: travel on foot. On anarchy servers the
-        // land near spawn is stripped bare, so a gathering quest first is brutal.
-        Quest starter = quests.generateByType(1, QuestType.TRAVEL);
-        if (starter == null) {
-            // Custom config without a travel template: keep the easy starter anyway.
-            starter = new Quest(1, List.of("builtin-travel"),
-                    List.of(new QuestObjective(QuestType.TRAVEL, "BLOCKS", 500,
-                            "Travel 500 blocks on foot")));
-        }
-        session.hand.add(starter);
-        excluded.addAll(starter.templateIds());
-        for (int i = 1; i < Session.HAND_SIZE; i++) {
-            Quest q = quests.generate(1, excluded);
-            session.hand.add(q);
-            excluded.addAll(q.templateIds());
+        List<Quest> repeat = repeatHands.remove(session.playerId);
+        if (repeat != null && !repeat.isEmpty()) {
+            // Owed hand: the player bailed on the last run with zero quest
+            // completions, so they get the same quests again. No re-rolls.
+            session.hand.addAll(repeat);
+            saveRepeatHands();
+            player.sendMessage(config.format("repeat-hand-notice", Map.of()));
+        } else {
+            List<String> excluded = new ArrayList<>();
+            // One guaranteed easy starter: travel on foot. On anarchy servers the
+            // land near spawn is stripped bare, so a gathering quest first is brutal.
+            Quest starter = quests.generateByType(1, QuestType.TRAVEL);
+            if (starter == null) {
+                // Custom config without a travel template: keep the easy starter anyway.
+                starter = new Quest(1, List.of("builtin-travel"),
+                        List.of(new QuestObjective(QuestType.TRAVEL, "BLOCKS", 500,
+                                "Travel 500 blocks on foot")));
+            }
+            session.hand.add(starter);
+            excluded.addAll(starter.templateIds());
+            for (int i = 1; i < Session.HAND_SIZE; i++) {
+                Quest q = quests.generate(1, excluded);
+                session.hand.add(q);
+                excluded.addAll(q.templateIds());
+            }
         }
         resetQuestClock(session, now);
         showRunHud(player, session, config.getQuestTimeSeconds() * 1000L);
@@ -909,6 +924,19 @@ public final class SessionManager {
             return;
         }
         pendingConfirms.remove(id);
+        // No free re-rolls: a run that ends with zero quests completed owes
+        // the player the same hand next time. An admin reset is a fresh
+        // start instead.
+        if (cause == ExitCause.ADMIN_RESET) {
+            if (repeatHands.remove(id) != null) {
+                saveRepeatHands();
+            }
+        } else if (s.questsCompleted == 0 && !s.hand.isEmpty()) {
+            repeatHands.put(id, new ArrayList<>(s.hand));
+            saveRepeatHands();
+        } else if (repeatHands.remove(id) != null) {
+            saveRepeatHands();
+        }
         Player player = Bukkit.getPlayer(id);
         Snapshot snapshot = snapshots.peek(id);
         int reached = reachedLevel(s);
@@ -1334,6 +1362,56 @@ public final class SessionManager {
         return new File(plugin.getDataFolder(), "restores.yml");
     }
 
+    private File repeatHandsFile() {
+        return new File(plugin.getDataFolder(), "repeat-hands.yml");
+    }
+
+    /** Test support: inspect the stored repeat hands. */
+    Map<UUID, List<Quest>> getRepeatHands() {
+        return repeatHands;
+    }
+
+    void saveRepeatHands() {
+        YamlConfiguration yaml = new YamlConfiguration();
+        for (Map.Entry<UUID, List<Quest>> e : repeatHands.entrySet()) {
+            List<Map<String, Object>> questList = new ArrayList<>();
+            for (Quest q : e.getValue()) {
+                questList.add(writeQuest(q));
+            }
+            yaml.set(e.getKey().toString(), questList);
+        }
+        try {
+            repeatHandsFile().getParentFile().mkdirs();
+            yaml.save(repeatHandsFile());
+        } catch (IOException e) {
+            plugin.getLogger().severe("Could not save repeat-hands.yml: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    void loadRepeatHands() {
+        repeatHands.clear();
+        File file = repeatHandsFile();
+        if (!file.exists()) {
+            return;
+        }
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        for (String key : yaml.getKeys(false)) {
+            try {
+                UUID id = UUID.fromString(key);
+                List<Quest> quests = new ArrayList<>();
+                for (Map<?, ?> qm : (List<Map<?, ?>>) (List<?>) yaml.getMapList(key)) {
+                    quests.add(readQuest(qm));
+                }
+                if (!quests.isEmpty()) {
+                    repeatHands.put(id, quests);
+                }
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning("Skipping invalid repeat-hands entry: " + key);
+            }
+        }
+    }
+
     public void saveSessions() {
         YamlConfiguration yaml = new YamlConfiguration();
         for (Session s : sessions.values()) {
@@ -1360,21 +1438,7 @@ public final class SessionManager {
             if (!s.hand.isEmpty()) {
                 List<Map<String, Object>> questList = new ArrayList<>();
                 for (Quest q : s.hand) {
-                    Map<String, Object> questMap = new HashMap<>();
-                    questMap.put("level", q.level());
-                    questMap.put("templateIds", q.templateIds());
-                    List<Map<String, Object>> objectives = new ArrayList<>();
-                    for (QuestObjective o : q.objectives()) {
-                        Map<String, Object> m = new HashMap<>();
-                        m.put("type", o.type().name());
-                        m.put("target", o.target());
-                        m.put("amount", o.amount());
-                        m.put("progress", o.progress());
-                        m.put("description", o.description());
-                        objectives.add(m);
-                    }
-                    questMap.put("objectives", objectives);
-                    questList.add(questMap);
+                    questList.add(writeQuest(q));
                 }
                 yaml.set(key + ".quests", questList);
             }
@@ -1469,6 +1533,24 @@ public final class SessionManager {
             }
         }
         plugin.getLogger().info("Restored " + sessions.size() + " hardcore session(s) from disk.");
+    }
+
+    private static Map<String, Object> writeQuest(Quest q) {
+        Map<String, Object> questMap = new HashMap<>();
+        questMap.put("level", q.level());
+        questMap.put("templateIds", q.templateIds());
+        List<Map<String, Object>> objectives = new ArrayList<>();
+        for (QuestObjective o : q.objectives()) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("type", o.type().name());
+            m.put("target", o.target());
+            m.put("amount", o.amount());
+            m.put("progress", o.progress());
+            m.put("description", o.description());
+            objectives.add(m);
+        }
+        questMap.put("objectives", objectives);
+        return questMap;
     }
 
     private static Quest readQuest(Map<?, ?> qm) {

@@ -26,6 +26,7 @@ public class HardcoreSpawn extends JavaPlugin {
         sessionManager.setDiscordNotifier(
                 new DiscordNotifier(hardcoreConfig.getDiscordWebhookUrl(), getLogger()));
         sessionManager.loadSessions();
+        sessionManager.loadRepeatHands();
         sessionManager.loadRestores();
         // Orphaned snapshots (restores dropped by the pre-1.10.2 restart bug)
         // are re-queued here so affected players get their items back on join.

@@ -6,7 +6,7 @@
 # backed up to config.yml.bak on startup: your settings carry over, but the
 # messages section and the quest bands are refreshed to the new format.
 # Never change this yourself.
-config-version: 14
+config-version: 15
 
 # Seconds allowed per quest. Flat forever — difficulty comes from the quests.
 quest-time-seconds: 300
@@ -185,6 +185,7 @@ messages:
   confirm-freeze-active: "§cYour run is already counting down — stay still!"
   confirm-freeze-cancelled: "§cYou took damage! The run did not start. Type /hardcore to try again."
   run-started: "§aHardcore run started! Complete §eone §aof these 4 quests before time runs out:\n{quests}\n§7({time} on the clock)"
+  repeat-hand-notice: "§eSame quests as last time — you bailed with zero completed. Finish at least one quest to earn a fresh set next run."
   new-quest: "§aNew quest: §e{quest} §7({time} left)\n§7Your 4 quests:\n{quests}"
   your-quests: "§7Your 4 quests:\n{quests}\n§7({time} left)"
   leaderboard-header: "§6§lHardcore Leaderboard §7(top 10 by best level)"

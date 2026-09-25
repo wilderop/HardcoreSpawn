@@ -6,7 +6,7 @@
 
     <groupId>com.wilderop</groupId>
     <artifactId>hardcorespawn</artifactId>
-    <version>1.10.5</version>
+    <version>1.10.6</version>
     <packaging>jar</packaging>
 
     <name>HardcoreSpawn</name>
