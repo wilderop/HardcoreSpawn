@@ -48,8 +48,14 @@ public final class HardcoreConfig {
     }
 
     /**
-     * A new server record level immediately awards a mob spawner block AND a
-     * random mob spawn egg (false disables).
+     * Prize tracks (false disables both):
+     * <ul>
+     *   <li>Mob spawner, rolled on every level-up: 100% when beating the
+     *   server record, otherwise 100% / 10^(record - level) (tie 10%, one
+     *   short 1%, ...).</li>
+     *   <li>Spawn egg: every 5 completed levels, one 10% roll for a random
+     *   egg.</li>
+     * </ul>
      */
     public boolean isHighScorePrizeEnabled() {
         return cfg.getBoolean("highscore-prize.enabled", true);

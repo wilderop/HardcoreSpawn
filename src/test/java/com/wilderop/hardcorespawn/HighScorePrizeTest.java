@@ -8,14 +8,24 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * High-score prize: a new SERVER record level awards BOTH a mob spawner
- * block and a random mob spawn egg. Personal bests below the server record
- * win nothing (but are still recorded for the leaderboard).
+ * Prize tracks, evaluated on every level-up against the live server record:
+ *
+ * <ul>
+ *   <li>Mob spawner: 100% when beating the record, otherwise decaying 10x per
+ *   level short of it (tie 10%, one short 1%, two short 0.1%, ...). There is no
+ *   once-per-run cap: every new record level wins a spawner.</li>
+ *   <li>Spawn egg: every 5 completed levels, one 10% roll for a random egg
+ *   from the passive-mob pool.</li>
+ * </ul>
+ *
+ * Personal bests are still recorded for the leaderboard even when they win
+ * nothing.
  */
 class HighScorePrizeTest extends PluginTestBase {
 
@@ -25,6 +35,9 @@ class HighScorePrizeTest extends PluginTestBase {
     @BeforeEach
     void clearLeaderboard() {
         plugin.getLeaderboardManager().clear();
+        // The SessionManager is shared across test methods: reset the prize
+        // RNG so a scripted Random from one test can't leak into the next.
+        sessions().setPrizeRandom(new Random());
     }
 
     private void freshRun() {
@@ -43,6 +56,26 @@ class HighScorePrizeTest extends PluginTestBase {
 
     private void setBest(UUID id, int best) {
         sessions().getLeaderboard().stats(id).bestLevel = best;
+    }
+
+    /** Jump the current run to the given completed-level count. */
+    private void setLevel(int level) {
+        sessions().getSession(player.getUniqueId()).level = level;
+    }
+
+    /** RNG that always returns the same double (and egg index 0). */
+    private static Random fixedRandom(double value) {
+        return new Random() {
+            @Override
+            public double nextDouble() {
+                return value;
+            }
+
+            @Override
+            public int nextInt(int bound) {
+                return 0;
+            }
+        };
     }
 
     private void forceQuest(QuestObjective objective) {
@@ -95,96 +128,170 @@ class HighScorePrizeTest extends PluginTestBase {
     }
 
     @Test
-    void prizeOnNewServerRecord() {
-        freshRun(); // best 0, server record 0
-        assertFalse(hasItem(Material.SPAWNER));
-        assertFalse(hasSpawnEgg());
-
-        completeOneBreakQuest(); // reached level 2 > record 0
-
-        assertTrue(hasItem(Material.SPAWNER), "a new server record must award a spawner block");
-        assertTrue(hasSpawnEgg(), "a new server record must award a spawn egg");
+    void spawnerChanceFormula() {
+        assertEquals(1.0, SessionManager.spawnerChance(51, 50), 0.0);
+        assertEquals(1.0, SessionManager.spawnerChance(100, 50), 0.0);
+        assertEquals(1.0, SessionManager.spawnerChance(2, 0), 0.0);
+        assertEquals(0.1, SessionManager.spawnerChance(50, 50), 1e-12);
+        assertEquals(0.01, SessionManager.spawnerChance(49, 50), 1e-12);
+        assertEquals(0.001, SessionManager.spawnerChance(48, 50), 1e-12);
     }
 
     @Test
-    void noPrizeForPersonalBestBelowServerRecord() {
+    void formatChanceFormats() {
+        assertEquals("100%", SessionManager.formatChance(1.0));
+        assertEquals("10%", SessionManager.formatChance(0.1));
+        assertEquals("1%", SessionManager.formatChance(0.01));
+        assertEquals("0.1%", SessionManager.formatChance(0.001));
+        assertEquals("0.01%", SessionManager.formatChance(0.0001));
+    }
+
+    @Test
+    void spawnerOnNewServerRecord() {
+        freshRun(); // best 0, server record 0
+
+        completeOneBreakQuest(); // reached level 2 > record 0: 100% spawner
+
+        assertTrue(hasItem(Material.SPAWNER), "beating the server record must award a spawner block");
+        assertFalse(hasSpawnEgg(), "record breaks no longer bundle a spawn egg");
+    }
+
+    @Test
+    void recordClimbEarnsSpawnerPerLevel() {
+        freshRun(); // best 0, server record 0
+
+        completeOneBreakQuest(); // reached 2 > 0: spawner, record -> 2
+        completeOneBreakQuest(); // reached 3 > 2: spawner, record -> 3
+        completeOneBreakQuest(); // reached 4 > 3: spawner, record -> 4
+
+        assertEquals(3, countItem(Material.SPAWNER),
+                "every new server record level must award a spawner (no once-per-run cap)");
+        assertEquals(4, sessions().getLeaderboard().serverRecord(),
+                "the record must ratchet up live as it is broken");
+    }
+
+    @Test
+    void noSpawnerBelowRecordWhenUnlucky() {
         PlayerMock other = newPlayer();
         setBest(other.getUniqueId(), 5); // server record held by someone else
-        freshRun(); // this player's best starts at 0
+        sessions().setPrizeRandom(fixedRandom(1.0)); // lose every roll
+        freshRun();
 
-        completeOneBreakQuest(); // reached level 2: a personal best, but below the record
+        completeOneBreakQuest(); // reached level 2: personal best, below the record
 
-        assertFalse(hasItem(Material.SPAWNER), "no spawner for a personal best below the server record");
-        assertFalse(hasSpawnEgg(), "no egg for a personal best below the server record");
+        assertFalse(hasItem(Material.SPAWNER), "a lost sub-record roll pays no spawner");
+        assertFalse(hasSpawnEgg(), "no egg outside a 5-level milestone");
         assertEquals(2, sessions().getLeaderboard().stats(player.getUniqueId()).bestLevel,
                 "the personal best must still be recorded for the leaderboard");
     }
 
     @Test
-    void tieDoesNotWin() {
+    void tieRollsTenPercent() {
         PlayerMock other = newPlayer();
-        setBest(other.getUniqueId(), 2);
+        setBest(other.getUniqueId(), 2); // server record 2
+        sessions().setPrizeRandom(fixedRandom(0.05)); // win the 10% roll
         freshRun();
 
-        completeOneBreakQuest(); // reached level 2: ties the record, does not beat it
+        completeOneBreakQuest(); // reached level 2 ties the record: 10% roll
 
-        assertFalse(hasItem(Material.SPAWNER), "tying the server record is not a new high score");
-        assertFalse(hasSpawnEgg(), "tying the server record is not a new high score");
+        assertTrue(hasItem(Material.SPAWNER), "tying the record rolls 10% for a spawner");
+        assertFalse(hasSpawnEgg(), "no egg outside a 5-level milestone");
+
+        sessions().setPrizeRandom(fixedRandom(0.5)); // lose the 10% roll
+        restartRun();
+
+        completeOneBreakQuest(); // reached level 2 ties the record again
+
+        assertFalse(hasItem(Material.SPAWNER), "a lost 10% roll pays no spawner");
     }
 
     @Test
-    void recordHolderWinsAgainOnNewRecord() {
+    void oneShortRollsOnePercent() {
+        PlayerMock other = newPlayer();
+        setBest(other.getUniqueId(), 10); // server record 10
+        sessions().setPrizeRandom(fixedRandom(0.005)); // win the 1% roll
         freshRun();
-        setBest(player.getUniqueId(), 1); // this player holds the record at 1
+        setLevel(7);
 
-        completeOneBreakQuest(); // reached level 2 > record 1
+        completeOneBreakQuest(); // reached level 9: one short of the record
 
-        assertTrue(hasItem(Material.SPAWNER), "beating your own server record must award the spawner");
-        assertTrue(hasSpawnEgg(), "beating your own server record must award the egg");
+        assertTrue(hasItem(Material.SPAWNER), "one short of the record rolls 1% for a spawner");
+        assertFalse(hasSpawnEgg(), "no egg outside a 5-level milestone");
+
+        sessions().setPrizeRandom(fixedRandom(0.05)); // lose the 1% roll
+        restartRun();
+        setLevel(7);
+
+        completeOneBreakQuest(); // reached level 9 again
+
+        assertFalse(hasItem(Material.SPAWNER), "a lost 1% roll pays no spawner");
     }
 
     @Test
-    void onlyOnePrizePerRun() {
-        freshRun(); // best 0, server record 0
+    void milestoneEggEveryFiveLevels() {
+        sessions().setPrizeRandom(fixedRandom(0.0)); // win every roll
+        freshRun();
+        setLevel(4);
 
-        completeOneBreakQuest(); // reached level 2 > record 0: wins the run's prize
-        assertTrue(hasItem(Material.SPAWNER), "the record level must award the spawner");
-        assertTrue(hasSpawnEgg(), "the record level must award the egg");
+        completeOneBreakQuest(); // 5th completed level: 10% egg roll
 
-        completeOneBreakQuest(); // reached level 3 > 2: no second prize
-        completeOneBreakQuest(); // reached level 4 > 3: no third prize
+        assertTrue(hasSpawnEgg(), "the 5th completed level must roll for a spawn egg");
 
-        assertEquals(1, countItem(Material.SPAWNER), "a run must award at most one spawner");
-        assertEquals(1, countSpawnEggs(), "a run must award at most one spawn egg");
+        sessions().setPrizeRandom(fixedRandom(0.5)); // lose the 10% roll
+        restartRun();
+        setLevel(4);
+
+        completeOneBreakQuest(); // 5th completed level again
+
+        assertFalse(hasSpawnEgg(), "a lost 10% roll pays no egg");
+    }
+
+    @Test
+    void milestoneEggRepeatsWithinRun() {
+        sessions().setPrizeRandom(fixedRandom(0.0)); // win every roll
+        freshRun();
+
+        for (int i = 0; i < 10; i++) {
+            completeOneBreakQuest();
+        }
+
+        assertEquals(2, countSpawnEggs(),
+                "each 5-level milestone must roll independently within one run");
     }
 
     @Test
     void newRunCanWinAgain() {
+        sessions().setPrizeRandom(fixedRandom(0.0)); // win every roll
         freshRun();
 
-        completeOneBreakQuest(); // reached level 2 > record 0: wins
+        completeOneBreakQuest(); // reached level 2 > record 0: spawner
         assertTrue(hasItem(Material.SPAWNER));
 
-        restartRun(); // same player, fresh run; inventory restored, flag reset
+        restartRun(); // same player, fresh run; inventory restored
 
-        completeOneBreakQuest(); // reached level 2: ties the record, no prize
-        assertFalse(hasItem(Material.SPAWNER), "tying the record wins nothing");
+        completeOneBreakQuest(); // reached level 2 ties record 2: 10% roll wins
+        completeOneBreakQuest(); // reached level 3 > 2: spawner again
 
-        completeOneBreakQuest(); // reached level 3 > 2: wins again
-        assertTrue(hasItem(Material.SPAWNER), "a new run that sets a new record must win");
-        assertTrue(hasSpawnEgg(), "a new run that sets a new record must win the egg");
+        assertEquals(2, countItem(Material.SPAWNER),
+                "a new run rolls again: tie 10% plus the new record level");
     }
 
     @Test
-    void prizeMessageWarnsToBank() {
-        String msg = sessions().getConfig().format("highscore-prize",
-                Map.of("level", "2", "mob", "Pig"));
-        assertTrue(msg.toLowerCase(java.util.Locale.ROOT).contains("chest"),
-                "the prize message must tell the winner to bank it in a chest: " + msg);
-        String dropped = sessions().getConfig().format("highscore-prize-dropped",
-                Map.of("level", "2", "mob", "Pig"));
-        assertTrue(dropped.toLowerCase(java.util.Locale.ROOT).contains("chest"),
-                "the dropped-prize message must tell the winner to bank it in a chest: " + dropped);
+    void prizeMessagesWarnToBank() {
+        for (String key : List.of("prize-spawner-won", "prize-spawner-dropped")) {
+            String msg = sessions().getConfig().format(key,
+                    Map.of("level", "2", "chance", "100%"));
+            assertTrue(msg.toLowerCase(java.util.Locale.ROOT).contains("chest"),
+                    "the spawner prize message must tell the winner to bank it in a chest: " + msg);
+        }
+        for (String key : List.of("prize-egg-won", "prize-egg-dropped")) {
+            String msg = sessions().getConfig().format(key,
+                    Map.of("level", "6", "mob", "Pig"));
+            assertTrue(msg.toLowerCase(java.util.Locale.ROOT).contains("chest"),
+                    "the egg prize message must tell the winner to bank it in a chest: " + msg);
+        }
+        String lost = sessions().getConfig().format("prize-egg-lost", Map.of("level", "6"));
+        assertTrue(lost.contains("6"), "the egg loss message must name the milestone level: " + lost);
     }
 
     @Test

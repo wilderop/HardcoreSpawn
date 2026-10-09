@@ -88,6 +88,14 @@ public final class SessionManager {
             Material.DONKEY_SPAWN_EGG, Material.LLAMA_SPAWN_EGG, Material.RABBIT_SPAWN_EGG,
             Material.TURTLE_SPAWN_EGG, Material.OCELOT_SPAWN_EGG, Material.DOLPHIN_SPAWN_EGG);
 
+    /** Every N completed levels, one roll for a random milestone spawn egg. */
+    private static final int MILESTONE_EGG_EVERY_LEVELS = 5;
+    /** Chance of winning the milestone spawn-egg roll. */
+    private static final double MILESTONE_EGG_CHANCE = 0.10;
+
+    /** RNG for prize rolls. Swappable in tests via {@link #setPrizeRandom}. */
+    private Random prizeRandom = new Random();
+
     private final HardcoreSpawn plugin;
     private HardcoreConfig config;
     private final SnapshotManager snapshots;
@@ -786,9 +794,13 @@ public final class SessionManager {
         }
         Quest replacement = quests.generate(s.level + 1, excluded);
         s.hand.add(replacement);
-        // The high-score prize pays out at most ONCE per run: the first level
-        // that sets a new server record wins a spawner block plus a spawn
-        // egg. Personal bests below the server record win nothing.
+        // Prizes, evaluated on every level-up against the live server record.
+        // There is no once-per-run cap; both tracks below are independent.
+        //  - Mob spawner: 100% when beating the record, otherwise decaying 10x
+        //    per level short of it (tie 10%, one short 1%, two short 0.1%, ...).
+        //    Wins are always announced; losses stay silent.
+        //  - Spawn egg: every 5 completed levels, one 10% roll for a random egg.
+        //    Wins and losses are announced.
         int reached = reachedLevel(s);
         if (config.isHighScorePrizeEnabled()) {
             LeaderboardManager.Stats stats = leaderboard.stats(player.getUniqueId());
@@ -798,11 +810,9 @@ public final class SessionManager {
                 // Record the new best immediately so the leaderboard stays live.
                 stats.bestLevel = reached;
             }
-            if (!s.prizeAwarded && reached > serverRecord) {
-                s.prizeAwarded = true;
-                leaderboard.save();
-                grantHighScorePrize(player, reached);
-            } else if (newBest) {
+            maybeGrantSpawnerPrize(player, reached, serverRecord);
+            maybeGrantMilestoneEgg(player, s, reached);
+            if (newBest) {
                 leaderboard.save();
             }
         }
@@ -820,30 +830,104 @@ public final class SessionManager {
         saveSessions();
     }
 
+    /** Test seam: replace the RNG used for prize rolls. */
+    void setPrizeRandom(Random rng) {
+        this.prizeRandom = rng;
+    }
+
     /**
-     * High-score prize: the first level of a run that sets a new server
-     * record awards BOTH an empty mob spawner block and a random mob spawn
-     * egg, at most once per run. Right-clicking the spawner
-     * with an egg sets what it spawns. Like all run loot they must be banked
-     * in a world chest or they are lost on death; a full inventory drops
-     * them at the player's feet.
+     * Spawner-roll win chance for {@code reached} against the live
+     * {@code serverRecord}: 100% when beating the record, otherwise decaying
+     * 10x per level short (tie 10%, one short 1%, two short 0.1%, ...).
      */
-    private void grantHighScorePrize(Player player, int level) {
-        Material egg = MILESTONE_EGGS.get(
-                java.util.concurrent.ThreadLocalRandom.current().nextInt(MILESTONE_EGGS.size()));
-        ItemStack spawner = new ItemStack(Material.SPAWNER, 1);
-        ItemStack eggStack = new ItemStack(egg, 1);
-        HashMap<Integer, ItemStack> leftover =
-                player.getInventory().addItem(spawner, eggStack);
-        String mobName = toMobName(egg);
-        Map<String, String> ph = Map.of("level", String.valueOf(level), "mob", mobName);
-        if (!leftover.isEmpty()) {
-            for (ItemStack item : leftover.values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), item);
-            }
-            player.sendMessage(config.format("highscore-prize-dropped", ph));
+    static double spawnerChance(int reached, int serverRecord) {
+        if (reached > serverRecord) {
+            return 1.0;
+        }
+        // reached <= record: tie -> 10^-1, one short -> 10^-2, ...
+        return Math.pow(0.1, serverRecord - reached + 1);
+    }
+
+    /** Roll against a win chance in [0, 1]. */
+    boolean rollPrize(double chance) {
+        return prizeRandom.nextDouble() < chance;
+    }
+
+    /**
+     * Mob-spawner prize, rolled on every level-up: beating the server record
+     * wins outright; anything at or below it rolls the decaying chance.
+     * Wins are always announced; losses stay silent so long climbs don't spam.
+     */
+    private void maybeGrantSpawnerPrize(Player player, int reached, int serverRecord) {
+        double chance = spawnerChance(reached, serverRecord);
+        if (!rollPrize(chance)) {
+            return;
+        }
+        grantPrizeItem(player, new ItemStack(Material.SPAWNER, 1),
+                "prize-spawner-won", "prize-spawner-dropped",
+                Map.of("level", String.valueOf(reached), "chance", formatChance(chance)));
+    }
+
+    /**
+     * Milestone spawn-egg prize: every {@value #MILESTONE_EGG_EVERY_LEVELS}
+     * completed levels, one {@value #MILESTONE_EGG_CHANCE} roll for a random
+     * egg from {@link #MILESTONE_EGGS}. Wins and losses are announced.
+     */
+    private void maybeGrantMilestoneEgg(Player player, Session s, int reached) {
+        if (s.level % MILESTONE_EGG_EVERY_LEVELS != 0) {
+            return;
+        }
+        if (rollPrize(MILESTONE_EGG_CHANCE)) {
+            Material egg = MILESTONE_EGGS.get(prizeRandom.nextInt(MILESTONE_EGGS.size()));
+            Map<String, String> ph = Map.of(
+                    "level", String.valueOf(reached), "mob", toMobName(egg));
+            grantPrizeItem(player, new ItemStack(egg, 1),
+                    "prize-egg-won", "prize-egg-dropped", ph);
         } else {
-            player.sendMessage(config.format("highscore-prize", ph));
+            player.sendMessage(config.format("prize-egg-lost",
+                    Map.of("level", String.valueOf(reached))));
+        }
+    }
+
+    /** 1.0 -> "100%", 0.1 -> "10%", 0.01 -> "1%", 0.001 -> "0.1%", ... */
+    static String formatChance(double chance) {
+        if (chance >= 1.0) {
+            return "100%";
+        }
+        if (chance <= 0.0) {
+            return "0%";
+        }
+        int k = (int) Math.round(-Math.log10(chance));
+        if (k <= 1) {
+            return "10%";
+        }
+        if (k == 2) {
+            return "1%";
+        }
+        StringBuilder sb = new StringBuilder("0.");
+        for (int i = 0; i < k - 3; i++) {
+            sb.append('0');
+        }
+        return sb.append("1%").toString();
+    }
+
+    /**
+     * Give the player a prize item, dropping it at their feet when the
+     * inventory is full. Right-clicking a spawner with an egg sets what it
+     * spawns. Like all run loot it must be banked in a world chest or it is
+     * lost when the run ends.
+     */
+    private void grantPrizeItem(Player player, ItemStack item,
+                                String wonKey, String droppedKey,
+                                Map<String, String> placeholders) {
+        HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(item);
+        if (!leftover.isEmpty()) {
+            for (ItemStack drop : leftover.values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), drop);
+            }
+            player.sendMessage(config.format(droppedKey, placeholders));
+        } else {
+            player.sendMessage(config.format(wonKey, placeholders));
         }
     }
 
@@ -1427,7 +1511,6 @@ public final class SessionManager {
             yaml.set(key + ".warned30", s.warned30);
             yaml.set(key + ".timeoutDamagePhase", s.timeoutDamagePhase);
             yaml.set(key + ".nextDamageMs", s.nextDamageMs);
-            yaml.set(key + ".prizeAwarded", s.prizeAwarded);
             Location r = s.returnLocation;
             yaml.set(key + ".return.world", r.getWorld().getName());
             yaml.set(key + ".return.x", r.getX());
@@ -1497,7 +1580,6 @@ public final class SessionManager {
                 s.warned30 = yaml.getBoolean(key + ".warned30");
                 s.timeoutDamagePhase = yaml.getBoolean(key + ".timeoutDamagePhase");
                 s.nextDamageMs = yaml.getLong(key + ".nextDamageMs");
-                s.prizeAwarded = yaml.getBoolean(key + ".prizeAwarded");
                 if (yaml.contains(key + ".quests")) {
                     for (Map<?, ?> qm : (List<Map<?, ?>>) (List<?>) yaml.getMapList(key + ".quests")) {
                         s.hand.add(readQuest(qm));
